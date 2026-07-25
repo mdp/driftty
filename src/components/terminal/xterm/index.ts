@@ -149,6 +149,7 @@ export class Xterm {
     ) as HTMLTextAreaElement | null;
     if (!textarea) return;
 
+    textarea.disabled = active;
     textarea.readOnly = active;
     textarea.inputMode = active ? 'none' : 'text';
     if (active) textarea.blur();

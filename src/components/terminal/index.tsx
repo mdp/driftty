@@ -106,6 +106,11 @@ export class Terminal extends Component<Props, State> {
           style={{
             height: `${Math.max(0, viewportHeight - webKeyboardHeight)}px`,
           }}
+          onPointerDownCapture={(event) => {
+            if (!showKeyboard) return;
+            event.preventDefault();
+            this.xterm.setWebKeyboardActive(true);
+          }}
           ref={(c) => {
             this.container = c as HTMLElement;
           }}
