@@ -8,6 +8,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ImageAddon } from '@xterm/addon-image';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { OverlayAddon } from './addons/overlay';
+import { MultilineWebLinksAddon } from './addons/multiline-web-links';
 import {
   applyInputModifier,
   type InputModifier,
@@ -96,6 +97,7 @@ export class Xterm {
   private fitAddon = new FitAddon();
   private overlayAddon = new OverlayAddon();
   private clipboardAddon = new ClipboardAddon();
+  private multilineWebLinksAddon = new MultilineWebLinksAddon();
   private webLinksAddon = new WebLinksAddon();
   private webglAddon?: WebglAddon;
 
@@ -230,8 +232,14 @@ export class Xterm {
   @bind
   public open(parent: HTMLElement) {
     this.terminal = new Terminal(this.options.termOptions);
-    const { terminal, fitAddon, overlayAddon, clipboardAddon, webLinksAddon } =
-      this;
+    const {
+      terminal,
+      fitAddon,
+      overlayAddon,
+      clipboardAddon,
+      multilineWebLinksAddon,
+      webLinksAddon,
+    } = this;
     window.term = terminal as TtydTerminal;
     window.term.fit = () => {
       this.fitAddon.fit();
@@ -240,6 +248,7 @@ export class Xterm {
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(overlayAddon);
     terminal.loadAddon(clipboardAddon);
+    terminal.loadAddon(multilineWebLinksAddon);
     terminal.loadAddon(webLinksAddon);
 
     terminal.open(parent);
