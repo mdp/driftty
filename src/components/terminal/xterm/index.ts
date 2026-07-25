@@ -123,6 +123,10 @@ export class Xterm {
     this.terminal?.scrollToBottom();
   }
 
+  public focus() {
+    this.terminal?.focus();
+  }
+
   public armInputModifier(modifier: InputModifier) {
     this.inputModifier = modifier;
     this.modifierListener?.(modifier);

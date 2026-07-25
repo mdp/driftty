@@ -1,0 +1,215 @@
+$void: #05080b;
+$panel: #091116;
+$cyan: #59f3ff;
+$green: #76ffb5;
+$magenta: #ff56d8;
+$amber: #ffd166;
+$danger: #ff5d7d;
+
+.voice-composer {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  z-index: 1200;
+  padding: 9px;
+  color: $cyan;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 3px,
+      rgba(0, 0, 0, 0.15) 4px
+    ),
+    linear-gradient(135deg, rgba(12, 27, 34, 0.99), rgba($void, 0.99));
+  border: 1px solid rgba($cyan, 0.68);
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.82),
+    0 0 24px rgba($cyan, 0.12),
+    inset 0 0 22px rgba($cyan, 0.035);
+  clip-path: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
+  animation: voice-composer-deploy 160ms ease-out;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 18px;
+    margin: 0 2px 7px;
+    font: 800 10px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    letter-spacing: 0.15em;
+  }
+
+  &__signal {
+    width: 6px;
+    height: 6px;
+    background: $magenta;
+    border-radius: 50%;
+    box-shadow:
+      0 0 6px $magenta,
+      0 0 12px rgba($magenta, 0.7);
+    animation: voice-signal 1.3s ease-in-out infinite;
+  }
+
+  &__native {
+    margin-left: auto;
+    color: rgba($green, 0.72);
+    font-size: 8px;
+    letter-spacing: 0.1em;
+  }
+
+  &__input {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    min-height: 92px;
+    max-height: 32vh;
+    padding: 10px 11px;
+    resize: vertical;
+    color: #eafff6;
+    caret-color: $magenta;
+    background: rgba(1, 5, 7, 0.92);
+    border: 1px solid rgba($cyan, 0.38);
+    border-radius: 0;
+    outline: none;
+    box-shadow:
+      inset 0 0 18px rgba(0, 0, 0, 0.8),
+      inset 3px 0 0 rgba($magenta, 0.7);
+    font: 500 16px/1.4 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+    &::placeholder {
+      color: #66858c;
+    }
+
+    &:focus {
+      border-color: rgba($cyan, 0.82);
+      box-shadow:
+        inset 0 0 18px rgba(0, 0, 0, 0.8),
+        inset 3px 0 0 $magenta,
+        0 0 12px rgba($cyan, 0.1);
+    }
+  }
+
+  &__actions {
+    display: grid;
+    grid-template-columns: 1fr 1.25fr 0.85fr 0.85fr;
+    gap: 6px;
+    margin-top: 8px;
+
+    button {
+      min-width: 0;
+      height: 38px;
+      padding: 0 5px;
+      color: $cyan;
+      background: linear-gradient(
+        180deg,
+        rgba(24, 43, 49, 0.96),
+        rgba(8, 15, 19, 0.98)
+      );
+      border: 1px solid rgba($cyan, 0.42);
+      font: 800 10px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      letter-spacing: 0.04em;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+
+      &:active {
+        color: $void;
+        background: $cyan;
+      }
+    }
+  }
+
+  &__action--run {
+    color: $void !important;
+    background: linear-gradient(135deg, $amber, #ff9f43) !important;
+    border-color: $amber !important;
+  }
+
+  &__action--close {
+    color: #ffdbe3 !important;
+    border-color: rgba($danger, 0.7) !important;
+  }
+}
+
+.voice-composer-toggle {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(66px, calc(env(safe-area-inset-right) + 66px));
+  z-index: 1001;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 42px;
+  padding: 0;
+  color: $magenta;
+  background: linear-gradient(
+    135deg,
+    rgba(35, 12, 31, 0.96),
+    rgba(5, 9, 12, 0.98)
+  );
+  border: 1px solid rgba($magenta, 0.68);
+  box-shadow:
+    0 0 18px rgba(0, 0, 0, 0.72),
+    0 0 12px rgba($magenta, 0.16);
+  font-size: 21px;
+  cursor: pointer;
+  touch-action: manipulation;
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
+
+  &--visible {
+    display: flex;
+  }
+
+  &:active {
+    color: $void;
+    background: $magenta;
+    transform: translateY(1px);
+  }
+}
+
+@keyframes voice-composer-deploy {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes voice-signal {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .voice-composer-toggle {
+    display: none;
+  }
+}
+
+@media (max-width: 370px) {
+  .voice-composer__actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-composer,
+  .voice-composer__signal {
+    animation: none;
+  }
+}
