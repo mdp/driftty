@@ -140,7 +140,7 @@ $danger: #ff5d7d;
 
 .voice-composer-toggle {
   position: absolute;
-  top: max(10px, env(safe-area-inset-top));
+  bottom: max(12px, env(safe-area-inset-bottom));
   right: max(66px, calc(env(safe-area-inset-right) + 66px));
   z-index: 1001;
   display: none;

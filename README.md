@@ -3,6 +3,10 @@
 A mobile-first [ttyd](https://github.com/tsl0922/ttyd) client, packaged as a
 general terminal image and an optional multi-host SSH gateway.
 
+The mobile controls include an auto-reconnect setting, enabled by default.
+Unexpected disconnects are retried five times with exponential backoff; after
+that, the terminal waits for the user to tap **Reconnect** or press Enter.
+
 The interface adds a safe-area-aware cyberpunk theme, a voice composer, font
 controls, navigation and tmux pads, curated Ctrl keys, and one-shot modifiers.
 The production client remains a single HTML file.

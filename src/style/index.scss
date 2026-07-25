@@ -56,6 +56,23 @@ body {
   }
 }
 
+.reconnect-button {
+  position: absolute;
+  bottom: max(76px, calc(env(safe-area-inset-bottom) + 76px));
+  left: 50%;
+  z-index: 1300;
+  padding: 11px 18px;
+  color: #05080b;
+  background: #59f3ff;
+  border: 0;
+  font: 800 13px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  cursor: pointer;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .terminal-shell::after {
     background: none;

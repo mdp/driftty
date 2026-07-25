@@ -12,6 +12,11 @@ import {
   applyInputModifier,
   type InputModifier,
 } from '../../keyboard-overlay/keys';
+import {
+  MAX_RECONNECT_ATTEMPTS,
+  reconnectDelay,
+  storeAutoReconnect,
+} from '../../../reconnect';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -50,6 +55,7 @@ export interface ClientOptions {
   isWindows: boolean;
   unicodeVersion: string;
   closeOnDisconnect: boolean;
+  autoReconnect: boolean;
 }
 
 export interface FlowControl {
@@ -102,13 +108,21 @@ export class Xterm {
   private reconnect = true;
   private doReconnect = true;
   private closeOnDisconnect = false;
+  private reconnectAttempts = 0;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
+  private manualReconnectKey?: IDisposable;
+  private disposed = false;
+  private reconnectListener?: (needsManualReconnect: boolean) => void;
   private inputModifier?: InputModifier;
   private modifierListener?: (modifier?: InputModifier) => void;
 
   private writeFunc = (data: ArrayBuffer) =>
     this.writeData(new Uint8Array(data));
 
-  constructor(private options: XtermOptions) {}
+  constructor(private options: XtermOptions) {
+    this.reconnect = options.clientOptions.autoReconnect;
+    this.doReconnect = this.reconnect;
+  }
 
   public getTerminal() {
     return this.terminal;
@@ -143,11 +157,44 @@ export class Xterm {
     this.modifierListener = listener;
   }
 
-  dispose() {
+  private clearListeners() {
     for (const d of this.disposables) {
       d.dispose();
     }
     this.disposables.length = 0;
+  }
+
+  dispose() {
+    this.disposed = true;
+    clearTimeout(this.reconnectTimer);
+    this.manualReconnectKey?.dispose();
+    this.clearListeners();
+    this.socket?.close();
+  }
+
+  public isAutoReconnectEnabled() {
+    return this.reconnect;
+  }
+
+  public setAutoReconnect(enabled: boolean) {
+    this.reconnect = enabled;
+    this.doReconnect = enabled;
+    storeAutoReconnect(enabled);
+    if (!enabled) clearTimeout(this.reconnectTimer);
+  }
+
+  public onReconnectRequired(listener?: (required: boolean) => void) {
+    this.reconnectListener = listener;
+  }
+
+  public reconnectNow() {
+    clearTimeout(this.reconnectTimer);
+    this.manualReconnectKey?.dispose();
+    this.manualReconnectKey = undefined;
+    this.reconnectAttempts = 0;
+    this.reconnectListener?.(false);
+    this.overlayAddon.showOverlay('Reconnecting...');
+    this.refreshToken().then(this.connect);
   }
 
   @bind
@@ -293,6 +340,7 @@ export class Xterm {
 
   @bind
   public connect() {
+    if (this.disposed) return;
     this.socket = new WebSocket(this.options.wsUrl, ['tty']);
     const { socket, register } = this;
 
@@ -303,9 +351,6 @@ export class Xterm {
     );
     register(
       addEventListener(socket, 'close', this.onSocketClose as EventListener),
-    );
-    register(
-      addEventListener(socket, 'error', () => (this.doReconnect = false)),
     );
   }
 
@@ -330,6 +375,10 @@ export class Xterm {
     }
 
     this.doReconnect = this.reconnect;
+    this.reconnectAttempts = 0;
+    this.manualReconnectKey?.dispose();
+    this.manualReconnectKey = undefined;
+    this.reconnectListener?.(false);
     this.initListeners();
     terminal.focus();
   }
@@ -338,27 +387,38 @@ export class Xterm {
   private onSocketClose(event: CloseEvent) {
     console.log(`[ttyd] websocket connection closed with code: ${event.code}`);
 
-    const { refreshToken, connect, doReconnect, overlayAddon } = this;
+    const { doReconnect, overlayAddon } = this;
     overlayAddon.showOverlay('Connection Closed');
-    this.dispose();
+    this.clearListeners();
 
     // 1000: CLOSE_NORMAL
-    if (event.code !== 1000 && doReconnect) {
-      overlayAddon.showOverlay('Reconnecting...');
-      refreshToken().then(connect);
+    if (
+      event.code !== 1000 &&
+      doReconnect &&
+      this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS
+    ) {
+      this.reconnectAttempts++;
+      const delay = reconnectDelay(this.reconnectAttempts);
+      overlayAddon.showOverlay(
+        `Reconnecting ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`,
+      );
+      this.reconnectTimer = setTimeout(
+        () => this.refreshToken().then(this.connect),
+        delay,
+      );
     } else if (this.closeOnDisconnect) {
       window.close();
     } else {
       const { terminal } = this;
-      const keyDispose = terminal.onKey((e) => {
+      this.manualReconnectKey?.dispose();
+      this.manualReconnectKey = terminal.onKey((e) => {
         const event = e.domEvent;
         if (event.key === 'Enter') {
-          keyDispose.dispose();
-          overlayAddon.showOverlay('Reconnecting...');
-          refreshToken().then(connect);
+          this.reconnectNow();
         }
       });
-      overlayAddon.showOverlay('Press ⏎ to Reconnect');
+      this.reconnectListener?.(true);
+      overlayAddon.showOverlay('Tap Reconnect or press ⏎');
     }
   }
 
@@ -454,6 +514,10 @@ export class Xterm {
             this.reconnect = false;
             this.doReconnect = false;
           }
+          break;
+        case 'autoReconnect':
+          this.reconnect = Boolean(value);
+          this.doReconnect = this.reconnect;
           break;
         case 'enableSixel':
           if (value) {

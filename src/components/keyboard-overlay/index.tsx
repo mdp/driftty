@@ -25,6 +25,7 @@ interface State {
   fontSize: number;
   modifier?: InputModifier;
   section: Section;
+  autoReconnect: boolean;
 }
 
 export class KeyboardOverlay extends Component<Props, State> {
@@ -34,6 +35,7 @@ export class KeyboardOverlay extends Component<Props, State> {
     this.state = {
       fontSize: terminal?.options?.fontSize || 13,
       section: 'agent',
+      autoReconnect: props.terminal.isAutoReconnectEnabled(),
     };
   }
 
@@ -83,6 +85,12 @@ export class KeyboardOverlay extends Component<Props, State> {
     } catch {
       // Storage can be disabled in privacy-focused browsers.
     }
+  };
+
+  private toggleAutoReconnect = () => {
+    const autoReconnect = !this.state.autoReconnect;
+    this.props.terminal.setAutoReconnect(autoReconnect);
+    this.setState({autoReconnect});
   };
 
   private renderKey = (key: ToolbarKey) => (
@@ -191,6 +199,14 @@ export class KeyboardOverlay extends Component<Props, State> {
             {this.state.section.replace('-', '_')}
           </span>
         </div>
+        <label class="keyboard-overlay__setting">
+          <input
+            type="checkbox"
+            checked={this.state.autoReconnect}
+            onChange={this.toggleAutoReconnect}
+          />
+          Auto reconnect
+        </label>
         <div class="keyboard-overlay__rail">
           {sections.map(({id, label}) => (
             <button

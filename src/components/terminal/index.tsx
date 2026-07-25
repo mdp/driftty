@@ -18,6 +18,7 @@ interface State {
   viewportOffsetTop: number;
   showComposer: boolean;
   composerValue: string;
+  reconnectRequired: boolean;
 }
 
 export class Terminal extends Component<Props, State> {
@@ -36,6 +37,7 @@ export class Terminal extends Component<Props, State> {
       viewportOffsetTop: window.visualViewport?.offsetTop ?? 0,
       showComposer: false,
       composerValue: '',
+      reconnectRequired: false,
     };
   }
 
@@ -44,6 +46,9 @@ export class Terminal extends Component<Props, State> {
   }
 
   async componentDidMount() {
+    this.xterm.onReconnectRequired((reconnectRequired) =>
+      this.setState({reconnectRequired})
+    );
     await this.xterm.refreshToken();
     this.xterm.open(this.container);
     this.xterm.connect();
@@ -69,6 +74,7 @@ export class Terminal extends Component<Props, State> {
       this.handleViewportChange
     );
     window.removeEventListener('resize', this.handleViewportChange);
+    this.xterm.onReconnectRequired();
     this.xterm.dispose();
   }
 
@@ -81,6 +87,7 @@ export class Terminal extends Component<Props, State> {
       viewportOffsetTop,
       showComposer,
       composerValue,
+      reconnectRequired,
     }: State
   ) {
     return (
@@ -102,6 +109,14 @@ export class Terminal extends Component<Props, State> {
           show={showKeyboard && !showComposer}
           onToggle={this.toggleKeyboard}
         />
+        {reconnectRequired && (
+          <button
+            class="reconnect-button"
+            onClick={() => this.xterm.reconnectNow()}
+          >
+            Reconnect
+          </button>
+        )}
         {showComposer && (
           <VoiceComposer
             value={composerValue}

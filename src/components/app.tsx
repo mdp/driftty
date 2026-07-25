@@ -5,6 +5,7 @@ import { Terminal } from './terminal';
 import type { ITerminalOptions, ITheme } from '@xterm/xterm';
 import type { ClientOptions, FlowControl } from './terminal/xterm';
 import {initialFontSize} from '../font-size';
+import {initialAutoReconnect} from '../reconnect';
 
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const path = window.location.pathname.replace(/[/]+$/, '');
@@ -30,6 +31,7 @@ const clientOptions = {
   disableResizeOverlay: false,
   enableSixel: false,
   closeOnDisconnect: false,
+  autoReconnect: initialAutoReconnect(),
   isWindows: false,
   unicodeVersion: '11',
 } as ClientOptions;
