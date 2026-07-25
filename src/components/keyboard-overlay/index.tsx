@@ -189,6 +189,14 @@ export class KeyboardOverlay extends Component<Props, State> {
         class="keyboard-overlay"
         onPointerDown={(event) => event.preventDefault()}
       >
+        <div class="keyboard-overlay__status" aria-hidden="true">
+          <span class="keyboard-overlay__signal" />
+          <span>TTYD//REMOTE</span>
+          <span class="keyboard-overlay__status-section">
+            {this.state.section.replace('-', '_')}
+          </span>
+          <span>LINK:UP</span>
+        </div>
         <div class="keyboard-overlay__rail">
           {sections.map(({id, label}) => (
             <button

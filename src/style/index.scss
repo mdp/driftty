@@ -4,6 +4,7 @@ body {
   min-height: 100%;
   margin: 0;
   overflow: hidden;
+  background: #05080b;
 }
 
 .terminal-shell {
@@ -12,6 +13,31 @@ body {
   left: 0;
   right: 0;
   overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(24, 72, 72, 0.08), transparent 68%),
+    #05080b;
+
+  &::after {
+    position: absolute;
+    inset: 0;
+    z-index: 900;
+    pointer-events: none;
+    content: '';
+    background:
+      repeating-linear-gradient(
+        0deg,
+        transparent 0,
+        transparent 3px,
+        rgba(0, 0, 0, 0.1) 4px
+      ),
+      linear-gradient(
+        90deg,
+        rgba(255, 86, 216, 0.018),
+        transparent 18%,
+        transparent 82%,
+        rgba(89, 243, 255, 0.018)
+      );
+  }
 }
 
 #terminal-container {
@@ -22,5 +48,16 @@ body {
   .terminal {
     padding: 5px;
     height: calc(100% - 10px);
+  }
+
+  .xterm-viewport {
+    scrollbar-color: rgba(89, 243, 255, 0.32) rgba(5, 8, 11, 0.6);
+    scrollbar-width: thin;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .terminal-shell::after {
+    background: none;
   }
 }
