@@ -48,17 +48,19 @@ function reconstructFrom(
   if (!first) return undefined;
 
   const left = first[1].length;
-  const right = left + first[2].length;
+  const firstEnd = left + first[2].length;
+  let right = firstEnd;
   let text = first[2];
   let previousReachedRight = true;
   let endY = startY;
-  let endX = right;
+  let endX = firstEnd;
   let fragments = 1;
 
   for (let y = startY + 1; y < startY + MAX_ROWS; y++) {
     if (!previousReachedRight) break;
     const line = source.getLine(y);
-    if (!line || line.isWrapped) break;
+    if (!line) break;
+    if (line.isWrapped) return undefined;
 
     const value = line.translateToString(true);
     const continuation = CONTINUATION.exec(value);
@@ -71,6 +73,13 @@ function reconstructFrom(
     fragments++;
     endY = y;
     endX = left + fragment.length;
+
+    if (fragments === 2 && endX >= firstEnd) {
+      // A CLI can put the URL prefix on a short first row (for example,
+      // "https://github.com/search?") before wrapping the query at its real
+      // content margin. The first continuation reveals that margin.
+      right = endX;
+    }
     previousReachedRight = endX === right;
 
     // Anything after the first token is a delimiter/description, so this row
