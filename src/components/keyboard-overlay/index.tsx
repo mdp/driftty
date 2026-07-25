@@ -3,10 +3,13 @@ import {clampFontSize} from '../../font-size';
 import {Xterm} from '../terminal/xterm';
 import {
   agentKeys,
+  applyInputModifier,
   controlKeys,
   type InputModifier,
+  letterRows,
   navigationKeys,
   sequences,
+  symbolRows,
   tmuxKeys,
   tmuxScrollKeys,
   type ToolbarKey,
@@ -20,12 +23,14 @@ interface Props {
 }
 
 type Section = 'agent' | 'nav' | 'ctrl' | 'tmux' | 'tmux-scroll';
+type KeyboardLayer = 'letters' | 'symbols';
 
 interface State {
   fontSize: number;
   modifier?: InputModifier;
   section: Section;
   autoReconnect: boolean;
+  layer: KeyboardLayer;
 }
 
 export class KeyboardOverlay extends Component<Props, State> {
@@ -36,6 +41,7 @@ export class KeyboardOverlay extends Component<Props, State> {
       fontSize: terminal?.options?.fontSize || 13,
       section: 'agent',
       autoReconnect: props.terminal.isAutoReconnectEnabled(),
+      layer: 'letters',
     };
   }
 
@@ -53,12 +59,26 @@ export class KeyboardOverlay extends Component<Props, State> {
     this.props.terminal.sendData(sequence);
   };
 
+  private typeCharacter = (value: string) => {
+    const {modifier} = this.state;
+    this.sendKey(modifier ? applyInputModifier(value, modifier) : value);
+    if (modifier) this.props.terminal.clearInputModifier();
+  };
+
   private sendToolbarKey = ({sequence}: ToolbarKey) => {
     this.sendKey(sequence);
   };
 
   private armModifier = (modifier: InputModifier) => {
     this.props.terminal.armInputModifier(modifier);
+  };
+
+  private toggleModifier = (modifier: InputModifier) => {
+    if (this.state.modifier === modifier) {
+      this.props.terminal.clearInputModifier();
+    } else {
+      this.props.terminal.armInputModifier(modifier);
+    }
   };
 
   private enterTmuxScroll = () => {
@@ -109,6 +129,90 @@ export class KeyboardOverlay extends Component<Props, State> {
       {key.label}
     </button>
   );
+
+  private renderTypingKey = (
+    label: string,
+    value: string,
+    className = ''
+  ) => (
+    <button
+      key={`${label}-${value}`}
+      class={`keyboard-overlay__key ${className}`}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => this.typeCharacter(value)}
+      aria-label={label}
+    >
+      {label}
+    </button>
+  );
+
+  private renderKeyboard() {
+    const {layer, modifier} = this.state;
+    const rows = layer === 'letters' ? letterRows : symbolRows;
+    const shifted = modifier === 'shift';
+
+    return (
+      <div class="keyboard-overlay__typing-keys">
+        {rows.map((row, rowIndex) => (
+          <div
+            class={`keyboard-overlay__key-row keyboard-overlay__key-row--${rowIndex}`}
+            key={`${layer}-${rowIndex}`}
+          >
+            {row.map(({label, value}) =>
+              this.renderTypingKey(
+                shifted ? label.toUpperCase() : label,
+                value
+              )
+            )}
+          </div>
+        ))}
+        <div class="keyboard-overlay__key-row keyboard-overlay__key-row--actions">
+          <button
+            class={`keyboard-overlay__key keyboard-overlay__key--modifier ${
+              modifier === 'ctrl' ? 'keyboard-overlay__key--latched' : ''
+            }`}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => this.toggleModifier('ctrl')}
+            aria-pressed={modifier === 'ctrl'}
+          >
+            Ctrl
+          </button>
+          <button
+            class={`keyboard-overlay__key keyboard-overlay__key--modifier ${
+              modifier === 'shift' ? 'keyboard-overlay__key--latched' : ''
+            }`}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => this.toggleModifier('shift')}
+            aria-pressed={modifier === 'shift'}
+          >
+            ⇧
+          </button>
+          <button
+            class={`keyboard-overlay__key keyboard-overlay__key--modifier ${
+              layer === 'symbols' ? 'keyboard-overlay__key--latched' : ''
+            }`}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() =>
+              this.setState({
+                layer: layer === 'letters' ? 'symbols' : 'letters',
+              })
+            }
+          >
+            {layer === 'letters' ? '#+=' : 'ABC'}
+          </button>
+          {this.renderTypingKey('Tab', sequences.tab, 'keyboard-overlay__key--wide')}
+          {this.renderTypingKey('/', '/', 'keyboard-overlay__key--shell')}
+          {this.renderTypingKey(
+            'space',
+            ' ',
+            'keyboard-overlay__key--space'
+          )}
+          {this.renderTypingKey('⌫', '\x7f', 'keyboard-overlay__key--wide')}
+          {this.renderTypingKey('↵', '\r', 'keyboard-overlay__key--enter')}
+        </div>
+      </div>
+    );
+  }
 
   private renderSection() {
     const {modifier, section} = this.state;
@@ -188,25 +292,22 @@ export class KeyboardOverlay extends Component<Props, State> {
       ];
 
     return (
-      <div
-        class="keyboard-overlay"
-        onPointerDown={(event) => event.preventDefault()}
-      >
-        <div class="keyboard-overlay__status" aria-hidden="true">
-          <span class="keyboard-overlay__signal" />
+      <div class="keyboard-overlay" onPointerDown={(event) => event.preventDefault()}>
+        <div class="keyboard-overlay__status">
+          <span class="keyboard-overlay__signal" aria-hidden="true" />
           <span>TTYD//REMOTE</span>
           <span class="keyboard-overlay__status-section">
             {this.state.section.replace('-', '_')}
           </span>
+          <label class="keyboard-overlay__setting">
+            <input
+              type="checkbox"
+              checked={this.state.autoReconnect}
+              onChange={this.toggleAutoReconnect}
+            />
+            Auto reconnect
+          </label>
         </div>
-        <label class="keyboard-overlay__setting">
-          <input
-            type="checkbox"
-            checked={this.state.autoReconnect}
-            onChange={this.toggleAutoReconnect}
-          />
-          Auto reconnect
-        </label>
         <div class="keyboard-overlay__rail">
           {sections.map(({id, label}) => (
             <button
@@ -236,12 +337,18 @@ export class KeyboardOverlay extends Component<Props, State> {
           <button
             class="keyboard-overlay__tab"
             onClick={this.props.onToggle}
-            title="Close controls"
+            title="Close keyboard"
+            aria-label="Close keyboard"
           >
-            ×
+            ⌄
           </button>
         </div>
-        {this.renderSection()}
+        <div class="keyboard-overlay__keyboard">
+          <div class="keyboard-overlay__special-keys">
+            {this.renderSection()}
+          </div>
+          {this.renderKeyboard()}
+        </div>
       </div>
     );
   }

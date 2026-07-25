@@ -3,7 +3,9 @@ import {
   agentKeys,
   applyInputModifier,
   controlKeys,
+  letterRows,
   sequences,
+  symbolRows,
   tmuxScrollKeys,
 } from './keys';
 
@@ -47,6 +49,18 @@ describe('terminal sequences', () => {
       '^C',
     ]);
   });
+
+  it('provides a complete QWERTY layout and shell-friendly symbols', () => {
+    expect(letterRows.map((row) => row.map(({value}) => value).join(''))).toEqual([
+      'qwertyuiop',
+      'asdfghjkl',
+      'zxcvbnm',
+    ]);
+    const symbols = symbolRows.flat().map(({value}) => value);
+    expect(symbols).toEqual(
+      expect.arrayContaining(['/', '\\', '|', '-', '_', '~', '`', '.', ':'])
+    );
+  });
 });
 
 describe('one-shot modifiers', () => {
@@ -59,5 +73,10 @@ describe('one-shot modifiers', () => {
   it('supports uppercase characters and back-tab through Shift', () => {
     expect(applyInputModifier('a', 'shift')).toBe('A');
     expect(applyInputModifier('\t', 'shift')).toBe('\x1b[Z');
+  });
+
+  it('leaves shell symbols intact when shift is armed', () => {
+    expect(applyInputModifier('/', 'shift')).toBe('/');
+    expect(applyInputModifier('-', 'shift')).toBe('-');
   });
 });

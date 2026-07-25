@@ -70,6 +70,29 @@ export const tmuxScrollKeys: ToolbarKey[] = [
 
 export type InputModifier = 'ctrl' | 'shift';
 
+export type KeyboardKey = {
+  label: string;
+  value: string;
+  width?: number;
+};
+
+export const letterRows: KeyboardKey[][] = [
+  'qwertyuiop'.split('').map((value) => ({label: value, value})),
+  'asdfghjkl'.split('').map((value) => ({label: value, value})),
+  'zxcvbnm'.split('').map((value) => ({label: value, value})),
+];
+
+export const symbolRows: KeyboardKey[][] = [
+  '1234567890'.split('').map((value) => ({label: value, value})),
+  ['-', '_', '=', '+', '/', '\\', '|', '~', '`'].map((value) => ({
+    label: value,
+    value,
+  })),
+  ['.', ',', ':', ';', "'", '"', '(', ')', '[', ']', '{', '}'].map(
+    (value) => ({label: value, value})
+  ),
+];
+
 function ctrlKey(
   label: string,
   character: string,
