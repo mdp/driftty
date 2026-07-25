@@ -1,0 +1,8 @@
+{
+  "name": "@ttyd-mobile/gateway",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "yaml": "2.8.2"
+  }
+}

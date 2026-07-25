@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+      - run: npm ci
+      - run: bun install --cwd gateway --frozen-lockfile
+      - run: npm run test:all
+      - run: npm run build
+      - run: test "$(find dist -maxdepth 1 -name '*.html' | wc -l)" -eq 1
+      - run: CLOUDFLARE_TUNNEL_TOKEN=validation docker compose config --quiet
+      - name: Build images
+        run: |
+          docker build --target generic -t ttyd-mobile:test .
+          docker build --target gateway -t ttyd-mobile-gateway:test .
+      - name: Smoke test arbitrary command
+        run: |
+          id=$(docker run -d -p 17681:7681 ttyd-mobile:test sh)
+          trap 'docker rm -f "$id"' EXIT
+          for attempt in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:17681/ >/dev/null && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:17681/ | grep -q 'terminal-container'
+      - name: Validate generated Caddy configuration
+        run: |
+          bun -e "import {caddyConfig} from './gateway/src/caddy.ts'; await Bun.write('/tmp/Caddyfile', caddyConfig([{slug:'baz',label:'Baz',host:'h',port:22,user:'u',key:'k',keyPath:'/keys/k',ttydPort:7800}]));"
+          docker run --rm -v /tmp/Caddyfile:/tmp/Caddyfile:ro --entrypoint caddy ttyd-mobile-gateway:test validate --config /tmp/Caddyfile --adapter caddyfile
+
+  publish-edge:
+    if: github.event_name == 'push'
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag: edge
+    secrets: inherit

@@ -1,0 +1,7 @@
+profiles:
+  - slug: baz
+    label: Baz server
+    host: baz.example.net
+    port: 22
+    user: mark
+    key: baz

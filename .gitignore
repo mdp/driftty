@@ -4,6 +4,9 @@ node_modules/
 # Build outputs
 dist/
 build/
+release/*.tar.gz
+release/ttyd-mobile-*/
+gateway/node_modules/
 
 # Environment variables
 .env
@@ -69,3 +72,8 @@ CLAUDE.md
 
 # devcontainer
 .devcontainer
+
+# Local gateway data
+keys/*
+!keys/.gitkeep
+config/profiles.yaml

@@ -2,82 +2,50 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
-  build-and-release:
-    name: Build and Release
+  publish:
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit
+
+  release:
+    needs: publish
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun scripts/package-release.ts "${GITHUB_REF_NAME}"
+      - run: cp "release/ttyd-mobile-${GITHUB_REF_NAME#v}.tar.gz" release/ttyd-mobile-compose.tar.gz
+      - uses: softprops/action-gh-release@v2
         with:
-          node-version: '18'
-          cache: 'npm'
-          
-      - name: Install dependencies
-        run: npm ci
-        
-      - name: Build project
-        run: npm run build
-        
-      - name: Verify build output
-        run: |
-          ls -la dist/
-          if [ ! -f "dist/inline.html" ]; then
-            echo "Error: dist/inline.html not found!"
-            exit 1
-          fi
-          echo "Build output size: $(du -h dist/inline.html)"
-          
-      - name: Extract version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-        
-      - name: Rename artifact for release
-        run: |
-          cp dist/inline.html dist/index.html
-          
-      - name: Create release
-        uses: softprops/action-gh-release@v1
-        with:
-          name: Release ${{ steps.get_version.outputs.VERSION }}
-          tag_name: ${{ steps.get_version.outputs.VERSION }}
-          files: |
-            dist/index.html
           generate_release_notes: true
-          draft: false
-          prerelease: false
-          body: |
-            ## ttyd Web Client with Overlay Keyboard
-            
-            This release contains a single HTML file with the complete ttyd web client including overlay keyboard support.
-            
-            ### Features
-            - 🚀 **Single HTML file** - All JavaScript, CSS, and assets inlined
-            - ⌨️ **Overlay keyboard** - On-screen buttons for Shift+Tab, Esc, and arrow keys
-            - 🎨 **Modern UI** - Built with Preact and TypeScript
-            - 🔄 **WebSocket support** - Real-time terminal communication
-            - 📱 **Mobile friendly** - Responsive design for all screen sizes
-            
-            ### Usage
-            1. Download `index.html` from the assets below
-            2. Embed in ttyd binary or serve directly
-            3. Access via web browser for terminal session
-            
-            ### Build Info
-            - **Version**: ${{ steps.get_version.outputs.VERSION }}
-            - **Build Date**: ${{ github.event.head_commit.timestamp }}
-            - **Commit**: ${{ github.sha }}
-            
-            Forked from [tsl0922/ttyd](https://github.com/tsl0922/ttyd)
+          files: release/ttyd-mobile-compose.tar.gz
+
+  latest:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add SemVer and latest tags
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          version="${VERSION#v}"
+          for image in ttyd-mobile ttyd-mobile-gateway; do
+            docker buildx imagetools create \
+              -t "ghcr.io/mdp/$image:$version" \
+              -t "ghcr.io/mdp/$image:latest" \
+              "ghcr.io/mdp/$image:$VERSION"
+          done

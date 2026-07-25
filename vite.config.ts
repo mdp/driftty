@@ -21,5 +21,6 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    exclude: ['gateway/**', 'node_modules/**'],
   },
 });

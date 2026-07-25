@@ -1,20 +1,23 @@
 {
   "private": true,
-  "name": "ttyd-overlay-keys-html",
-  "version": "2.0.0",
-  "description": "Mobile-friendly single-file ttyd web client",
+  "name": "ttyd-mobile",
+  "version": "3.0.0",
+  "description": "Mobile-friendly ttyd client and optional multi-host SSH gateway",
   "repository": {
-    "url": "https://github.com/ar90n/ttyd-overlay-keys-html.git",
+    "url": "https://github.com/mdp/ttyd-mobile.git",
     "type": "git"
   },
-  "author": "Shuanglei Tao <tsl0922@gmail.com>",
+  "author": "Mark Percival",
   "license": "MIT",
   "scripts": {
     "dev": "vite",
     "start": "vite",
     "build": "tsc --noEmit && vite build",
     "check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:gateway": "cd gateway && bun test",
+    "test:all": "npm test && npm run test:gateway",
+    "release:bundle": "bun scripts/package-release.ts"
   },
   "engines": {
     "node": ">=22.12"
