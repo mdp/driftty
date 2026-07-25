@@ -4,14 +4,12 @@ import { Xterm, XtermOptions } from './xterm';
 import { KeyboardOverlay } from '../keyboard-overlay';
 
 import '@xterm/xterm/css/xterm.css';
-import { Modal } from '../modal';
 
 interface Props extends XtermOptions {
   id: string;
 }
 
 interface State {
-  modal: boolean;
   showKeyboard: boolean;
 }
 
@@ -21,9 +19,8 @@ export class Terminal extends Component<Props, State> {
 
   constructor(props: Props) {
     super();
-    this.xterm = new Xterm(props, this.showModal);
+    this.xterm = new Xterm(props);
     this.state = {
-      modal: false,
       showKeyboard: false,
     };
   }
@@ -42,22 +39,15 @@ export class Terminal extends Component<Props, State> {
     this.xterm.dispose();
   }
 
-  render({ id }: Props, { modal, showKeyboard }: State) {
+  render({ id }: Props, { showKeyboard }: State) {
     return (
       <div style="position: relative; height: 100%;">
-        <div id={id} ref={(c) => (this.container = c as HTMLElement)}>
-          <Modal show={modal}>
-            <label class="file-label">
-              <input
-                onChange={this.sendFile}
-                class="file-input"
-                type="file"
-                multiple
-              />
-              <span class="file-cta">Choose files…</span>
-            </label>
-          </Modal>
-        </div>
+        <div
+          id={id}
+          ref={(c) => {
+            this.container = c as HTMLElement;
+          }}
+        />
         <KeyboardOverlay
           terminal={this.xterm}
           show={showKeyboard}
@@ -77,19 +67,7 @@ export class Terminal extends Component<Props, State> {
   }
 
   @bind
-  showModal() {
-    this.setState({ modal: true });
-  }
-
-  @bind
   toggleKeyboard() {
     this.setState((prevState) => ({ showKeyboard: !prevState.showKeyboard }));
-  }
-
-  @bind
-  sendFile(event: Event) {
-    this.setState({ modal: false });
-    const files = (event.target as HTMLInputElement).files;
-    if (files) this.xterm.sendFile(files);
   }
 }

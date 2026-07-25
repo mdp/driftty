@@ -1,5 +1,7 @@
 import { h, Component } from 'preact';
 import { Xterm } from '../terminal/xterm';
+import {clampFontSize} from '../../font-size';
+import {terminalKeys} from './keys';
 import './keyboard-overlay.scss';
 
 interface Props {
@@ -33,7 +35,7 @@ export class KeyboardOverlay extends Component<Props, State> {
     const term = terminal?.getTerminal();
     if (term) {
       const currentSize = term.options.fontSize || 13;
-      const newSize = Math.max(10, Math.min(24, currentSize + delta));
+      const newSize = clampFontSize(currentSize + delta);
       term.options.fontSize = newSize;
       this.setState({ fontSize: newSize });
 
@@ -56,34 +58,16 @@ export class KeyboardOverlay extends Component<Props, State> {
     return (
       <div class="keyboard-overlay">
         <div class="keyboard-overlay__buttons">
-          <button
-            class="keyboard-overlay__button"
-            onClick={() => this.sendKey('\x1b[Z')}
-            title="Shift+Tab"
-          >
-            ⇧ Tab
-          </button>
-          <button
-            class="keyboard-overlay__button"
-            onClick={() => this.sendKey('\x1b')}
-            title="Escape"
-          >
-            Esc
-          </button>
-          <button
-            class="keyboard-overlay__button"
-            onClick={() => this.sendKey('\x1b[A')}
-            title="Up Arrow"
-          >
-            ↑
-          </button>
-          <button
-            class="keyboard-overlay__button"
-            onClick={() => this.sendKey('\x1b[B')}
-            title="Down Arrow"
-          >
-            ↓
-          </button>
+          {terminalKeys.map(({label, sequence, title}) => (
+            <button
+              class="keyboard-overlay__button"
+              onClick={() => this.sendKey(sequence)}
+              title={title}
+              aria-label={title}
+            >
+              {label}
+            </button>
+          ))}
           <button
             class="keyboard-overlay__button keyboard-overlay__button--font"
             onClick={() => this.adjustFontSize(-1)}

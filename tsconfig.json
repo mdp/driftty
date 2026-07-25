@@ -1,19 +1,24 @@
 {
-  "extends": "./node_modules/gts/tsconfig-google.json",
   "compilerOptions": {
-    "moduleResolution": "node",
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "esModuleInterop": true,
-    "jsx": "react",
-    "jsxFactory": "h",
-    "allowJs": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "allowJs": false,
     "noImplicitAny": false,
+    "noEmit": true,
     "declaration": false,
     "experimentalDecorators": true,
     "strictPropertyInitialization": false,
-    "lib": ["es2019", "dom"],
+    "skipLibCheck": true,
+    "types": ["vite/client", "vitest/globals"],
+    "lib": ["ES2020", "DOM", "DOM.Iterable"]
   },
   "include": [
     "src/**/*.tsx",
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "vite.config.ts"
   ]
 }

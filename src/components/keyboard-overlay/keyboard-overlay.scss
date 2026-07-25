@@ -124,23 +124,23 @@
 // Large buttons for all touch devices (iPhone, Android, tablets)
 @media (hover: none) and (pointer: coarse) {
   .keyboard-overlay {
-    padding: 20px;
+    padding: max(10px, env(safe-area-inset-top)) 10px 10px;
     
     &__buttons {
-      gap: 20px;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(64px, 1fr));
+      gap: 8px;
     }
     
     &__button {
-      min-width: 150px;
-      height: 80px;
-      padding: 15px 20px;
-      font-size: 24px;
+      min-width: 0;
+      height: 48px;
+      padding: 8px;
+      font-size: 16px;
       font-weight: bold;
       
       // Font adjustment buttons
       &--font {
-        min-width: 100px;
         background-color: rgba(66, 122, 179, 0.2);
         border-color: rgba(66, 122, 179, 0.5);
         
@@ -160,31 +160,33 @@
 // Smaller buttons for iPhone screens (430px and below)
 @media (hover: none) and (pointer: coarse) and (max-width: 430px) {
   .keyboard-overlay {
-    padding: 12px;
+    padding: max(8px, env(safe-area-inset-top)) 8px 8px;
     
     &__buttons {
-      gap: 12px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
     }
     
     &__button {
-      min-width: 100px;
-      height: 50px;
-      padding: 10px 14px;
-      font-size: 18px;
-      
-      &--font {
-        min-width: 70px;
-      }
+      min-width: 0;
+      height: 44px;
+      padding: 6px 4px;
+      font-size: 14px;
     }
   }
   
   .keyboard-toggle {
-    width: 75px;
-    height: 75px;
+    top: auto;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    transform: none;
+    width: 52px;
+    height: 52px;
+    background-color: rgba(0, 0, 0, 0.65);
     
     svg {
-      width: 34px;
-      height: 34px;
+      width: 26px;
+      height: 26px;
     }
   }
 }

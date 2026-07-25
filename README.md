@@ -20,12 +20,16 @@ Access your terminal at http://localhost:7681 with mobile-optimized overlay keyb
 
 ## Features
 - Single HTML file output for embedding in ttyd binary
-- Overlay keyboard for Shift+Tab, Esc, and arrow keys
-- Built with Preact + TypeScript + xterm.js
+- Compact, safe-area-aware overlay keyboard for mobile devices
+- Tab, Shift+Tab, Esc, all arrow keys, Ctrl-C, Ctrl-D, and Ctrl-L
+- Persistent font-size controls
+- Built with Preact, TypeScript, Vite, and `vite-plugin-singlefile`
+- Unit-tested with Vitest
 
 ## Build
 ```bash
-npm install
+npm ci
+npm test
 npm run build
 ```
 

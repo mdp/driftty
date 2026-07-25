@@ -1,7 +1,6 @@
 import { bind } from 'decko';
 import type { IDisposable, ITerminalOptions } from '@xterm/xterm';
 import { Terminal } from '@xterm/xterm';
-import { CanvasAddon } from '@xterm/addon-canvas';
 import { ClipboardAddon } from '@xterm/addon-clipboard';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { FitAddon } from '@xterm/addon-fit';
@@ -9,7 +8,6 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ImageAddon } from '@xterm/addon-image';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { OverlayAddon } from './addons/overlay';
-import { ZmodemAddon } from './addons/zmodem';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -43,12 +41,9 @@ export interface ClientOptions {
   rendererType: RendererType;
   disableLeaveAlert: boolean;
   disableResizeOverlay: boolean;
-  enableZmodem: boolean;
-  enableTrzsz: boolean;
   enableSixel: boolean;
   titleFixed?: string;
   isWindows: boolean;
-  trzszDragInitTimeout: number;
   unicodeVersion: string;
   closeOnDisconnect: boolean;
 }
@@ -93,8 +88,6 @@ export class Xterm {
   private clipboardAddon = new ClipboardAddon();
   private webLinksAddon = new WebLinksAddon();
   private webglAddon?: WebglAddon;
-  private canvasAddon?: CanvasAddon;
-  private zmodemAddon?: ZmodemAddon;
 
   private socket?: WebSocket;
   private token: string;
@@ -109,10 +102,7 @@ export class Xterm {
   private writeFunc = (data: ArrayBuffer) =>
     this.writeData(new Uint8Array(data));
 
-  constructor(
-    private options: XtermOptions,
-    private sendCb: () => void,
-  ) {}
+  constructor(private options: XtermOptions) {}
 
   public getTerminal() {
     return this.terminal;
@@ -129,11 +119,6 @@ export class Xterm {
   private register<T extends IDisposable>(d: T): T {
     this.disposables.push(d);
     return d;
-  }
-
-  @bind
-  public sendFile(files: FileList) {
-    this.zmodemAddon?.sendFile(files);
   }
 
   @bind
@@ -401,20 +386,6 @@ export class Xterm {
   @bind
   private applyPreferences(prefs: Preferences) {
     const { terminal, fitAddon, register } = this;
-    if (prefs.enableZmodem || prefs.enableTrzsz) {
-      this.zmodemAddon = new ZmodemAddon({
-        zmodem: prefs.enableZmodem,
-        trzsz: prefs.enableTrzsz,
-        windows: prefs.isWindows,
-        trzszDragInitTimeout: prefs.trzszDragInitTimeout,
-        onSend: this.sendCb,
-        sender: this.sendData,
-        writer: this.writeData,
-      });
-      this.writeFunc = (data) => this.zmodemAddon?.consume(data);
-      terminal.loadAddon(register(this.zmodemAddon));
-    }
-
     for (const [key, value] of Object.entries(prefs)) {
       switch (key) {
         case 'rendererType':
@@ -438,15 +409,6 @@ export class Xterm {
             this.reconnect = false;
             this.doReconnect = false;
           }
-          break;
-        case 'enableZmodem':
-          if (value) console.log('[ttyd] Zmodem enabled');
-          break;
-        case 'enableTrzsz':
-          if (value) console.log('[ttyd] trzsz enabled');
-          break;
-        case 'trzszDragInitTimeout':
-          if (value) console.log(`[ttyd] trzsz drag init timeout: ${value}`);
           break;
         case 'enableSixel':
           if (value) {
@@ -508,14 +470,6 @@ export class Xterm {
   @bind
   private setRendererType(value: RendererType) {
     const { terminal } = this;
-    const disposeCanvasRenderer = () => {
-      try {
-        this.canvasAddon?.dispose();
-      } catch {
-        // ignore
-      }
-      this.canvasAddon = undefined;
-    };
     const disposeWebglRenderer = () => {
       try {
         this.webglAddon?.dispose();
@@ -524,25 +478,9 @@ export class Xterm {
       }
       this.webglAddon = undefined;
     };
-    const enableCanvasRenderer = () => {
-      if (this.canvasAddon) return;
-      this.canvasAddon = new CanvasAddon();
-      disposeWebglRenderer();
-      try {
-        this.terminal.loadAddon(this.canvasAddon);
-        console.log('[ttyd] canvas renderer loaded');
-      } catch (e) {
-        console.log(
-          '[ttyd] canvas renderer could not be loaded, falling back to dom renderer',
-          e,
-        );
-        disposeCanvasRenderer();
-      }
-    };
     const enableWebglRenderer = () => {
       if (this.webglAddon) return;
       this.webglAddon = new WebglAddon();
-      disposeCanvasRenderer();
       try {
         this.webglAddon.onContextLoss(() => {
           this.webglAddon?.dispose();
@@ -551,24 +489,23 @@ export class Xterm {
         console.log('[ttyd] WebGL renderer loaded');
       } catch (e) {
         console.log(
-          '[ttyd] WebGL renderer could not be loaded, falling back to canvas renderer',
+          '[ttyd] WebGL renderer could not be loaded, falling back to DOM',
           e,
         );
         disposeWebglRenderer();
-        enableCanvasRenderer();
       }
     };
 
     switch (value) {
       case 'canvas':
-        enableCanvasRenderer();
+        disposeWebglRenderer();
+        console.log('[ttyd] canvas renderer is obsolete; using DOM');
         break;
       case 'webgl':
         enableWebglRenderer();
         break;
       case 'dom':
         disposeWebglRenderer();
-        disposeCanvasRenderer();
         console.log('[ttyd] dom renderer loaded');
         break;
       default:
