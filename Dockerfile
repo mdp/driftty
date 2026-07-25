@@ -24,7 +24,7 @@ FROM oven/bun:1-alpine AS bun-runtime
 
 FROM generic AS gateway
 
-RUN apk add --no-cache caddy openssh-client
+RUN apk add --no-cache caddy openssh-client libstdc++ libgcc
 COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /opt/ttyd-mobile
 COPY gateway/package.json gateway/bun.lock ./

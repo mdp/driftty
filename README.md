@@ -56,13 +56,16 @@ profiles:
     port: 22
     user: mark
     key: baz
+    autorun: tmux new-session -A -s ttyd
 ```
 
 `slug` must contain lowercase letters, numbers, and hyphens and is exposed at
 `/baz/`. Slugs must be unique. `label`, `host`, `user`, and `key` are required;
 `port` defaults to 22. A key is a filename directly under `/keys`—absolute
 paths and traversal are rejected. Invalid configuration or unreadable keys
-stop the gateway.
+stop the gateway. `autorun` is optional. When set, it runs in the remote
+login shell with `TTYD_SESSION=1`; when the command exits, the terminal
+connection closes. Omit it to open the normal interactive login shell.
 
 One profile redirects `/` to its terminal. Multiple profiles show a mobile
 picker containing labels only. `/slug` redirects to `/slug/`; unknown paths

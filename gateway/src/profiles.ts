@@ -11,6 +11,7 @@ export interface Profile {
   user: string;
   key: string;
   keyPath: string;
+  autorun?: string;
 }
 
 interface LoadOptions {
@@ -55,6 +56,9 @@ export async function parseProfiles(
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
       throw new Error(`profile ${index + 1}: invalid port`);
     }
+    const autorun = value.autorun === undefined
+      ? undefined
+      : required(value.autorun, 'autorun', index);
 
     return {
       slug,
@@ -64,6 +68,7 @@ export async function parseProfiles(
       user: required(value.user, 'user', index),
       key,
       keyPath: join(keysDir, key),
+      autorun,
     };
   });
 

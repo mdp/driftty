@@ -5,3 +5,4 @@ profiles:
     port: 22
     user: mark
     key: baz
+    # autorun: tmux new-session -A -s ttyd
