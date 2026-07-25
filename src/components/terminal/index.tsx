@@ -19,6 +19,7 @@ interface State {
   showComposer: boolean;
   composerValue: string;
   reconnectRequired: boolean;
+  webKeyboardHeight: number;
 }
 
 export class Terminal extends Component<Props, State> {
@@ -38,6 +39,7 @@ export class Terminal extends Component<Props, State> {
       showComposer: false,
       composerValue: '',
       reconnectRequired: false,
+      webKeyboardHeight: 0,
     };
   }
 
@@ -88,6 +90,7 @@ export class Terminal extends Component<Props, State> {
       showComposer,
       composerValue,
       reconnectRequired,
+      webKeyboardHeight,
     }: State
   ) {
     return (
@@ -100,6 +103,9 @@ export class Terminal extends Component<Props, State> {
       >
         <div
           id={id}
+          style={{
+            height: `${Math.max(0, viewportHeight - webKeyboardHeight)}px`,
+          }}
           ref={(c) => {
             this.container = c as HTMLElement;
           }}
@@ -108,6 +114,7 @@ export class Terminal extends Component<Props, State> {
           terminal={this.xterm}
           show={showKeyboard && !showComposer}
           onToggle={this.toggleKeyboard}
+          onHeightChange={this.handleWebKeyboardHeight}
         />
         {reconnectRequired && (
           <button
@@ -172,11 +179,24 @@ export class Terminal extends Component<Props, State> {
 
   @bind
   toggleKeyboard() {
-    this.setState((prevState) => ({ showKeyboard: !prevState.showKeyboard }));
+    const showKeyboard = !this.state.showKeyboard;
+    this.xterm.setWebKeyboardActive(showKeyboard);
+    this.setState({showKeyboard});
   }
+
+  private handleWebKeyboardHeight = (webKeyboardHeight: number) => {
+    if (webKeyboardHeight === this.state.webKeyboardHeight) return;
+    this.setState({webKeyboardHeight}, () =>
+      requestAnimationFrame(() => {
+        this.xterm.fit();
+        this.xterm.scrollToBottom();
+      })
+    );
+  };
 
   @bind
   openComposer() {
+    this.xterm.setWebKeyboardActive(false);
     this.setState({ showComposer: true, showKeyboard: false });
   }
 

@@ -143,6 +143,17 @@ export class Xterm {
     this.terminal?.focus();
   }
 
+  public setWebKeyboardActive(active: boolean) {
+    const textarea = this.terminal?.element?.querySelector(
+      '.xterm-helper-textarea'
+    ) as HTMLTextAreaElement | null;
+    if (!textarea) return;
+
+    textarea.readOnly = active;
+    textarea.inputMode = active ? 'none' : 'text';
+    if (active) textarea.blur();
+  }
+
   public armInputModifier(modifier: InputModifier) {
     this.inputModifier = modifier;
     this.modifierListener?.(modifier);

@@ -20,6 +20,7 @@ interface Props {
   terminal: Xterm;
   show: boolean;
   onToggle: () => void;
+  onHeightChange: (height: number) => void;
 }
 
 type Section = 'agent' | 'nav' | 'ctrl' | 'tmux' | 'tmux-scroll';
@@ -34,6 +35,8 @@ interface State {
 }
 
 export class KeyboardOverlay extends Component<Props, State> {
+  private resizeObserver?: ResizeObserver;
+
   constructor(props: Props) {
     super(props);
     const terminal = props.terminal?.getTerminal();
@@ -52,8 +55,26 @@ export class KeyboardOverlay extends Component<Props, State> {
   }
 
   componentWillUnmount() {
+    this.resizeObserver?.disconnect();
+    this.props.onHeightChange(0);
     this.props.terminal.onInputModifierChange();
   }
+
+  private setOverlayElement = (element: HTMLDivElement | null) => {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = undefined;
+
+    if (!element) {
+      this.props.onHeightChange(0);
+      return;
+    }
+
+    const reportHeight = () =>
+      this.props.onHeightChange(Math.ceil(element.getBoundingClientRect().height));
+    reportHeight();
+    this.resizeObserver = new ResizeObserver(reportHeight);
+    this.resizeObserver.observe(element);
+  };
 
   private sendKey = (sequence: string) => {
     this.props.terminal.sendData(sequence);
@@ -292,7 +313,11 @@ export class KeyboardOverlay extends Component<Props, State> {
       ];
 
     return (
-      <div class="keyboard-overlay" onPointerDown={(event) => event.preventDefault()}>
+      <div
+        ref={this.setOverlayElement}
+        class="keyboard-overlay"
+        onPointerDown={(event) => event.preventDefault()}
+      >
         <div class="keyboard-overlay__status">
           <span class="keyboard-overlay__signal" aria-hidden="true" />
           <span>TTYD//REMOTE</span>
