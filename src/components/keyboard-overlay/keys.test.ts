@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {
   agentKeys,
   applyInputModifier,
+  controlKeys,
   sequences,
   tmuxScrollKeys,
 } from './keys';
@@ -21,6 +22,30 @@ describe('terminal sequences', () => {
     const labels = agentKeys.map(({label}) => label);
     expect(labels.length).toBeLessThanOrEqual(8);
     expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it('lays out curated control keys as one symbol row and two alpha rows', () => {
+    expect(controlKeys).toHaveLength(16);
+    expect(controlKeys.slice(0, 4).map(({label}) => label)).toEqual([
+      'Esc',
+      '^\\',
+      '^_',
+      'Del',
+    ]);
+    expect(controlKeys.slice(4).map(({label}) => label)).toEqual([
+      '^W',
+      '^E',
+      '^R',
+      '^U',
+      '^P',
+      '^A',
+      '^D',
+      '^G',
+      '^L',
+      '^Z',
+      '^X',
+      '^C',
+    ]);
   });
 });
 

@@ -1,12 +1,12 @@
 import { Component, h } from 'preact';
 import { bind } from 'decko';
-import { composerPayload, type ComposerAction } from './actions';
+import { composerPayloads, type ComposerAction } from './actions';
 import './voice-composer.scss';
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
-  onSend: (value: string) => void;
+  onSend: (payloads: string[]) => void;
   onClose: () => void;
 }
 
@@ -92,7 +92,7 @@ export class VoiceComposer extends Component<Props, State> {
   private send(action: ComposerAction) {
     const { value, onSend } = this.props;
     if (!value && action === 'insert') return;
-    onSend(composerPayload(value, action));
+    onSend(composerPayloads(value, action));
   }
 
   @bind

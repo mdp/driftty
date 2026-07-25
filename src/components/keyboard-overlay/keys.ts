@@ -70,6 +70,39 @@ export const tmuxScrollKeys: ToolbarKey[] = [
 
 export type InputModifier = 'ctrl' | 'shift';
 
+function ctrlKey(
+  label: string,
+  character: string,
+  title: string,
+  emphasis?: ToolbarKey['emphasis']
+): ToolbarKey {
+  return {
+    label,
+    sequence: applyInputModifier(character, 'ctrl'),
+    title,
+    emphasis,
+  };
+}
+
+export const controlKeys: ToolbarKey[] = [
+  ctrlKey('Esc', '[', 'Ctrl-[ — Escape'),
+  ctrlKey('^\\', '\\', 'Ctrl-\\ — Quit foreground process'),
+  ctrlKey('^_', '_', 'Ctrl-_ — Undo last edit'),
+  ctrlKey('Del', '?', 'Ctrl-? — Delete backward'),
+  ctrlKey('^W', 'W', 'Ctrl-W — Delete previous word'),
+  ctrlKey('^E', 'E', 'Ctrl-E — Move to end of line'),
+  ctrlKey('^R', 'R', 'Ctrl-R — Search history or rename session'),
+  ctrlKey('^U', 'U', 'Ctrl-U — Delete to start of line'),
+  ctrlKey('^P', 'P', 'Ctrl-P — Previous item or command list'),
+  ctrlKey('^A', 'A', 'Ctrl-A — Move to start of line'),
+  ctrlKey('^D', 'D', 'Ctrl-D — Delete, EOF, or exit'),
+  ctrlKey('^G', 'G', 'Ctrl-G — Cancel active prompt or response'),
+  ctrlKey('^L', 'L', 'Ctrl-L — Clear or redraw screen'),
+  ctrlKey('^Z', 'Z', 'Ctrl-Z — Suspend foreground process'),
+  ctrlKey('^X', 'X', 'Ctrl-X — OpenCode leader or command prefix'),
+  ctrlKey('^C', 'C', 'Ctrl-C — Interrupt or cancel', 'danger'),
+];
+
 export function applyInputModifier(
   data: string,
   modifier: InputModifier

@@ -1,20 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { composerPayload } from './actions';
+import { composerPayloads } from './actions';
 
-describe('composerPayload', () => {
+describe('composerPayloads', () => {
   it('inserts dictated text without executing it', () => {
-    expect(composerPayload('git status', 'insert')).toBe('git status');
+    expect(composerPayloads('git status', 'insert')).toEqual(['git status']);
   });
 
-  it('uses a carriage return to execute terminal input', () => {
-    expect(composerPayload('git status', 'insert-return')).toBe(
-      'git status\r',
-    );
+  it('sends Enter separately so terminal input is executed, not pasted', () => {
+    expect(composerPayloads('git status', 'insert-return')).toEqual([
+      'git status',
+      '\r',
+    ]);
   });
 
   it('preserves multiline text', () => {
-    expect(composerPayload('first\nsecond', 'insert-return')).toBe(
-      'first\nsecond\r',
-    );
+    expect(composerPayloads('first\nsecond', 'insert-return')).toEqual([
+      'first\nsecond',
+      '\r',
+    ]);
   });
 });

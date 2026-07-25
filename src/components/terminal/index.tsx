@@ -176,8 +176,10 @@ export class Terminal extends Component<Props, State> {
   }
 
   @bind
-  sendComposer(value: string) {
-    this.xterm.sendData(value);
+  sendComposer(payloads: string[]) {
+    for (const payload of payloads) {
+      this.xterm.sendData(payload);
+    }
     this.setState(
       { showComposer: false, composerValue: '' },
       () => this.xterm.focus(),

@@ -3,6 +3,7 @@ import {clampFontSize} from '../../font-size';
 import {Xterm} from '../terminal/xterm';
 import {
   agentKeys,
+  controlKeys,
   type InputModifier,
   navigationKeys,
   sequences,
@@ -25,14 +26,6 @@ interface State {
   modifier?: InputModifier;
   section: Section;
 }
-
-const controlShortcuts: ToolbarKey[] = ['B', 'C', 'D', 'L', 'R', 'U', 'W'].map(
-  (letter) => ({
-    label: `Ctrl-${letter}`,
-    sequence: String.fromCharCode(letter.charCodeAt(0) & 0x1f),
-    title: `Send Ctrl-${letter}`,
-  })
-);
 
 export class KeyboardOverlay extends Component<Props, State> {
   constructor(props: Props) {
@@ -131,26 +124,28 @@ export class KeyboardOverlay extends Component<Props, State> {
 
     if (section === 'ctrl') {
       return (
-        <div class="keyboard-overlay__buttons">
+        <div class="keyboard-overlay__buttons keyboard-overlay__buttons--ctrl">
           <button
             class={`keyboard-overlay__button keyboard-overlay__button--accent ${
               modifier === 'ctrl' ? 'keyboard-overlay__button--latched' : ''
             }`}
             onClick={() => this.armModifier('ctrl')}
-            title="Apply Ctrl to the next key typed"
+            title="Apply Ctrl to the next native-keyboard character"
+            aria-label="Apply Ctrl to the next native-keyboard character"
           >
-            Ctrl next
+            CTRL
           </button>
           <button
             class={`keyboard-overlay__button keyboard-overlay__button--accent ${
               modifier === 'shift' ? 'keyboard-overlay__button--latched' : ''
             }`}
             onClick={() => this.armModifier('shift')}
-            title="Apply Shift to the next key typed"
+            title="Apply Shift to the next native-keyboard character"
+            aria-label="Apply Shift to the next native-keyboard character"
           >
-            Shift next
+            SHIFT
           </button>
-          {controlShortcuts.map(this.renderKey)}
+          {controlKeys.map(this.renderKey)}
         </div>
       );
     }
@@ -195,7 +190,6 @@ export class KeyboardOverlay extends Component<Props, State> {
           <span class="keyboard-overlay__status-section">
             {this.state.section.replace('-', '_')}
           </span>
-          <span>LINK:UP</span>
         </div>
         <div class="keyboard-overlay__rail">
           {sections.map(({id, label}) => (
