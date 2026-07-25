@@ -8,6 +8,10 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ImageAddon } from '@xterm/addon-image';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { OverlayAddon } from './addons/overlay';
+import {
+  applyInputModifier,
+  type InputModifier,
+} from '../../keyboard-overlay/keys';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -98,6 +102,8 @@ export class Xterm {
   private reconnect = true;
   private doReconnect = true;
   private closeOnDisconnect = false;
+  private inputModifier?: InputModifier;
+  private modifierListener?: (modifier?: InputModifier) => void;
 
   private writeFunc = (data: ArrayBuffer) =>
     this.writeData(new Uint8Array(data));
@@ -106,6 +112,31 @@ export class Xterm {
 
   public getTerminal() {
     return this.terminal;
+  }
+
+  public fit() {
+    if (!this.opened) return;
+    this.fitAddon.fit();
+  }
+
+  public scrollToBottom() {
+    this.terminal?.scrollToBottom();
+  }
+
+  public armInputModifier(modifier: InputModifier) {
+    this.inputModifier = modifier;
+    this.modifierListener?.(modifier);
+  }
+
+  public clearInputModifier() {
+    this.inputModifier = undefined;
+    this.modifierListener?.();
+  }
+
+  public onInputModifierChange(
+    listener?: (modifier?: InputModifier) => void
+  ) {
+    this.modifierListener = listener;
   }
 
   dispose() {
@@ -174,7 +205,17 @@ export class Xterm {
         }
       }),
     );
-    register(terminal.onData((data) => sendData(data)));
+    register(
+      terminal.onData((data) => {
+        const modifier = this.inputModifier;
+        if (!modifier) {
+          sendData(data);
+          return;
+        }
+        sendData(applyInputModifier(data, modifier));
+        this.clearInputModifier();
+      })
+    );
     register(
       terminal.onBinary((data) =>
         sendData(Uint8Array.from(data, (v) => v.charCodeAt(0))),

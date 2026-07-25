@@ -1,119 +1,147 @@
 .keyboard-overlay {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   z-index: 1000;
-  background-color: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(4px);
-  padding: 8px;
-  animation: slideDown 0.2s ease-out;
+  padding: max(8px, env(safe-area-inset-top)) 8px 8px;
+  background: rgba(12, 14, 18, 0.94);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px);
+  animation: slide-down 160ms ease-out;
+
+  &__rail {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 7px;
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__tab,
+  &__button {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 7px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+    font: 600 14px/1 system-ui, sans-serif;
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+
+    &:active {
+      background: rgba(255, 255, 255, 0.24);
+      transform: scale(0.96);
+    }
+  }
+
+  &__tab {
+    flex: 1 0 auto;
+    min-width: 48px;
+    height: 34px;
+    padding: 0 10px;
+
+    &--active {
+      color: #fff;
+      background: #2869a8;
+      border-color: #5fa3e5;
+    }
+  }
 
   &__buttons {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
   }
 
   &__button {
-    min-width: 60px;
-    height: 40px;
-    padding: 8px 16px;
-    background-color: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 4px;
-    color: #fff;
-    font-size: 14px;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
+    min-width: 0;
+    height: 42px;
+    padding: 4px;
 
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.2);
-      border-color: rgba(255, 255, 255, 0.5);
+    &--accent {
+      background: rgba(40, 105, 168, 0.42);
+      border-color: rgba(95, 163, 229, 0.75);
     }
 
-    &:active {
-      background-color: rgba(255, 255, 255, 0.3);
-      transform: scale(0.95);
+    &--danger {
+      background: rgba(173, 51, 51, 0.45);
+      border-color: rgba(238, 100, 100, 0.72);
     }
 
-    &:focus {
-      outline: 2px solid rgba(255, 255, 255, 0.5);
-      outline-offset: 2px;
+    &--latched {
+      background: #2869a8;
+      box-shadow: 0 0 0 2px rgba(95, 163, 229, 0.45);
     }
+  }
+
+  &__mode-label {
+    margin: 2px 0 7px;
+    color: #8ec8ff;
+    font: 700 12px/1 system-ui, sans-serif;
+    letter-spacing: 0.12em;
+    text-align: center;
   }
 }
 
 .keyboard-toggle {
-  position: fixed;
-  top: 50%;
-  right: 16px;
-  transform: translateY(-50%);
-  width: 120px;
-  height: 120px;
-  background-color: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  color: #fff;
+  position: absolute;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 1001;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  color: #fff;
+  background: rgba(12, 14, 18, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  backdrop-filter: blur(8px);
   cursor: pointer;
-  transition: all 0.2s ease;
-  z-index: 1001;
   touch-action: manipulation;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.4);
-    border-color: rgba(255, 255, 255, 0.5);
-  }
+  -webkit-tap-highlight-color: transparent;
 
   &:active {
-    transform: scale(0.95);
+    transform: scale(0.94);
   }
 
   &--active {
-    background-color: rgba(255, 255, 255, 0.2);
+    background: #2869a8;
+  }
+
+  &--software-open {
+    top: max(10px, env(safe-area-inset-top));
+    bottom: auto;
+    width: 44px;
+    height: 44px;
   }
 
   svg {
-    width: 54px;
-    height: 54px;
+    width: 26px;
+    height: 26px;
   }
 }
 
-@keyframes slideDown {
+@keyframes slide-down {
   from {
+    opacity: 0;
     transform: translateY(-100%);
-    opacity: 0;
   }
   to {
-    transform: translateY(0);
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
-@keyframes slideUp {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-// Hide keyboard overlay completely on desktop devices
 @media (hover: hover) and (pointer: fine) {
   .keyboard-overlay,
   .keyboard-toggle {
@@ -121,72 +149,22 @@
   }
 }
 
-// Large buttons for all touch devices (iPhone, Android, tablets)
-@media (hover: none) and (pointer: coarse) {
+@media (max-width: 430px) {
   .keyboard-overlay {
-    padding: max(10px, env(safe-area-inset-top)) 10px 10px;
-    
     &__buttons {
-      display: grid;
-      grid-template-columns: repeat(6, minmax(64px, 1fr));
-      gap: 8px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
-    
-    &__button {
-      min-width: 0;
-      height: 48px;
-      padding: 8px;
-      font-size: 16px;
-      font-weight: bold;
-      
-      // Font adjustment buttons
-      &--font {
-        background-color: rgba(66, 122, 179, 0.2);
-        border-color: rgba(66, 122, 179, 0.5);
-        
-        &:hover {
-          background-color: rgba(66, 122, 179, 0.3);
-          border-color: rgba(66, 122, 179, 0.7);
-        }
-        
-        &:active {
-          background-color: rgba(66, 122, 179, 0.4);
-        }
-      }
-    }
-  }
-}
 
-// Smaller buttons for iPhone screens (430px and below)
-@media (hover: none) and (pointer: coarse) and (max-width: 430px) {
-  .keyboard-overlay {
-    padding: max(8px, env(safe-area-inset-top)) 8px 8px;
-    
-    &__buttons {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 6px;
-    }
-    
     &__button {
-      min-width: 0;
-      height: 44px;
-      padding: 6px 4px;
-      font-size: 14px;
+      height: 40px;
+      font-size: 13px;
     }
-  }
-  
-  .keyboard-toggle {
-    top: auto;
-    right: max(12px, env(safe-area-inset-right));
-    bottom: max(12px, env(safe-area-inset-bottom));
-    transform: none;
-    width: 52px;
-    height: 52px;
-    background-color: rgba(0, 0, 0, 0.65);
-    
-    svg {
-      width: 26px;
-      height: 26px;
+
+    &__tab {
+      min-width: 44px;
+      height: 32px;
+      padding: 0 8px;
+      font-size: 12px;
     }
   }
 }

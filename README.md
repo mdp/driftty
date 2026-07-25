@@ -21,7 +21,10 @@ Access your terminal at http://localhost:7681 with mobile-optimized overlay keyb
 ## Features
 - Single HTML file output for embedding in ttyd binary
 - Compact, safe-area-aware overlay keyboard for mobile devices
-- Tab, Shift+Tab, Esc, all arrow keys, Ctrl-C, Ctrl-D, and Ctrl-L
+- Agent, navigation, Ctrl, and tmux control sections
+- One-shot Ctrl and Shift modifiers for the native mobile keyboard
+- Dedicated tmux scroll mode with PgUp, PgDn, arrows, and Exit
+- VisualViewport-aware terminal resizing when the iOS keyboard opens
 - Persistent font-size controls
 - Built with Preact, TypeScript, Vite, and `vite-plugin-singlefile`
 - Unit-tested with Vitest

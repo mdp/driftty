@@ -1,23 +1,38 @@
 import {describe, expect, it} from 'vitest';
-import {terminalKeys} from './keys';
+import {
+  agentKeys,
+  applyInputModifier,
+  sequences,
+  tmuxScrollKeys,
+} from './keys';
 
-describe('terminalKeys', () => {
-  it('sends the expected control-byte sequences', () => {
-    const sequences = Object.fromEntries(
-      terminalKeys.map(({label, sequence}) => [label, sequence])
+describe('terminal sequences', () => {
+  it('defines the tmux scroll entry and page navigation sequences', () => {
+    expect(sequences.tmuxScroll).toBe('\x02[');
+    expect(tmuxScrollKeys.map(({sequence}) => sequence)).toContain(
+      sequences.pageUp
     );
-
-    expect(sequences).toMatchObject({
-      Tab: '\t',
-      Esc: '\x1b',
-      'Ctrl-C': '\x03',
-      'Ctrl-D': '\x04',
-      'Ctrl-L': '\x0c',
-    });
+    expect(tmuxScrollKeys.map(({sequence}) => sequence)).toContain(
+      sequences.pageDown
+    );
   });
 
-  it('does not define duplicate labels', () => {
-    const labels = terminalKeys.map(({label}) => label);
+  it('keeps the default agent toolbar compact and uniquely labeled', () => {
+    const labels = agentKeys.map(({label}) => label);
+    expect(labels.length).toBeLessThanOrEqual(8);
     expect(new Set(labels).size).toBe(labels.length);
+  });
+});
+
+describe('one-shot modifiers', () => {
+  it('turns letters and terminal symbols into control bytes', () => {
+    expect(applyInputModifier('b', 'ctrl')).toBe('\x02');
+    expect(applyInputModifier('c', 'ctrl')).toBe('\x03');
+    expect(applyInputModifier('[', 'ctrl')).toBe('\x1b');
+  });
+
+  it('supports uppercase characters and back-tab through Shift', () => {
+    expect(applyInputModifier('a', 'shift')).toBe('A');
+    expect(applyInputModifier('\t', 'shift')).toBe('\x1b[Z');
   });
 });

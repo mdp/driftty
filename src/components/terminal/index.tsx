@@ -2,6 +2,7 @@ import { bind } from 'decko';
 import { Component, h } from 'preact';
 import { Xterm, XtermOptions } from './xterm';
 import { KeyboardOverlay } from '../keyboard-overlay';
+import {measureVisualViewport} from '../../visual-viewport';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -11,17 +12,25 @@ interface Props extends XtermOptions {
 
 interface State {
   showKeyboard: boolean;
+  softwareKeyboardOpen: boolean;
+  viewportHeight: number;
+  viewportOffsetTop: number;
 }
 
 export class Terminal extends Component<Props, State> {
   private container: HTMLElement;
   private xterm: Xterm;
+  private layoutHeight = window.innerHeight;
+  private layoutWidth = window.innerWidth;
 
   constructor(props: Props) {
     super();
     this.xterm = new Xterm(props);
     this.state = {
       showKeyboard: false,
+      softwareKeyboardOpen: false,
+      viewportHeight: window.visualViewport?.height ?? window.innerHeight,
+      viewportOffsetTop: window.visualViewport?.offsetTop ?? 0,
     };
   }
 
@@ -33,15 +42,48 @@ export class Terminal extends Component<Props, State> {
     await this.xterm.refreshToken();
     this.xterm.open(this.container);
     this.xterm.connect();
+    window.visualViewport?.addEventListener(
+      'resize',
+      this.handleViewportChange
+    );
+    window.visualViewport?.addEventListener(
+      'scroll',
+      this.handleViewportChange
+    );
+    window.addEventListener('resize', this.handleViewportChange);
+    this.handleViewportChange();
   }
 
   componentWillUnmount() {
+    window.visualViewport?.removeEventListener(
+      'resize',
+      this.handleViewportChange
+    );
+    window.visualViewport?.removeEventListener(
+      'scroll',
+      this.handleViewportChange
+    );
+    window.removeEventListener('resize', this.handleViewportChange);
     this.xterm.dispose();
   }
 
-  render({ id }: Props, { showKeyboard }: State) {
+  render(
+    {id}: Props,
+    {
+      showKeyboard,
+      softwareKeyboardOpen,
+      viewportHeight,
+      viewportOffsetTop,
+    }: State
+  ) {
     return (
-      <div style="position: relative; height: 100%;">
+      <div
+        class="terminal-shell"
+        style={{
+          height: `${viewportHeight}px`,
+          transform: `translateY(${viewportOffsetTop}px)`,
+        }}
+      >
         <div
           id={id}
           ref={(c) => {
@@ -54,9 +96,15 @@ export class Terminal extends Component<Props, State> {
           onToggle={this.toggleKeyboard}
         />
         <button
-          class={`keyboard-toggle ${showKeyboard ? 'keyboard-toggle--active' : ''}`}
+          class={`keyboard-toggle ${
+            showKeyboard ? 'keyboard-toggle--active' : ''
+          } ${
+            softwareKeyboardOpen ? 'keyboard-toggle--software-open' : ''
+          }`}
+          onMouseDown={(event) => event.preventDefault()}
           onClick={this.toggleKeyboard}
           title="Toggle keyboard overlay"
+          aria-label="Toggle terminal controls"
         >
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z" />
@@ -70,4 +118,54 @@ export class Terminal extends Component<Props, State> {
   toggleKeyboard() {
     this.setState((prevState) => ({ showKeyboard: !prevState.showKeyboard }));
   }
+
+  private handleViewportChange = () => {
+    const viewport = window.visualViewport;
+    const currentWidth = window.innerWidth;
+
+    if (Math.abs(currentWidth - this.layoutWidth) > 50) {
+      this.layoutWidth = currentWidth;
+      this.layoutHeight = window.innerHeight;
+    }
+
+    if (!viewport) {
+      this.setState(
+        {
+          viewportHeight: window.innerHeight,
+          viewportOffsetTop: 0,
+          softwareKeyboardOpen: false,
+        },
+        () => this.xterm.fit()
+      );
+      return;
+    }
+
+    if (viewport.height > this.layoutHeight) {
+      this.layoutHeight = viewport.height;
+    }
+
+    const measurement = measureVisualViewport(
+      this.layoutHeight,
+      viewport.height,
+      viewport.offsetTop,
+      viewport.scale
+    );
+    const keyboardJustOpened =
+      measurement.keyboardOpen && !this.state.softwareKeyboardOpen;
+
+    this.setState(
+      {
+        viewportHeight: measurement.height,
+        viewportOffsetTop: measurement.offsetTop,
+        softwareKeyboardOpen: measurement.keyboardOpen,
+        showKeyboard: keyboardJustOpened ? false : this.state.showKeyboard,
+      },
+      () => {
+        requestAnimationFrame(() => {
+          this.xterm.fit();
+          if (keyboardJustOpened) this.xterm.scrollToBottom();
+        });
+      }
+    );
+  };
 }
