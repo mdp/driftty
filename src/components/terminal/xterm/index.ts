@@ -391,9 +391,8 @@ export class Xterm {
     overlayAddon.showOverlay('Connection Closed');
     this.clearListeners();
 
-    // 1000: CLOSE_NORMAL
     if (
-      event.code !== 1000 &&
+      !this.disposed &&
       doReconnect &&
       this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS
     ) {
