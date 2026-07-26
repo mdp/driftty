@@ -138,51 +138,6 @@ $danger: #ff5d7d;
   }
 }
 
-.voice-composer-toggle {
-  position: absolute;
-  bottom: max(12px, env(safe-area-inset-bottom));
-  right: max(66px, calc(env(safe-area-inset-right) + 66px));
-  z-index: 1001;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 42px;
-  padding: 0;
-  color: $magenta;
-  background: linear-gradient(
-    135deg,
-    rgba(35, 12, 31, 0.96),
-    rgba(5, 9, 12, 0.98)
-  );
-  border: 1px solid rgba($magenta, 0.68);
-  box-shadow:
-    0 0 18px rgba(0, 0, 0, 0.72),
-    0 0 12px rgba($magenta, 0.16);
-  font: 800 12px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  touch-action: manipulation;
-  clip-path: polygon(
-    8px 0,
-    100% 0,
-    100% calc(100% - 8px),
-    calc(100% - 8px) 100%,
-    0 100%,
-    0 8px
-  );
-
-  &--visible {
-    display: flex;
-  }
-
-  &:active {
-    color: $void;
-    background: $magenta;
-    transform: translateY(1px);
-  }
-}
-
 @keyframes voice-composer-deploy {
   from {
     opacity: 0;
@@ -193,12 +148,6 @@ $danger: #ff5d7d;
 @keyframes voice-signal {
   50% {
     opacity: 0.45;
-  }
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .voice-composer-toggle {
-    display: none;
   }
 }
 

@@ -3,6 +3,7 @@ import { Component, h } from 'preact';
 import {TouchSelectionBox, Xterm, XtermOptions} from './xterm';
 import { KeyboardOverlay } from '../keyboard-overlay';
 import { VoiceComposer } from '../voice-composer';
+import {TerminalLauncher} from '../terminal-launcher';
 import {measureVisualViewport} from '../../visual-viewport';
 import {isTouchCapable} from '../../touch-input';
 import type {ComposerSubmission} from '../voice-composer/actions';
@@ -166,28 +167,20 @@ export class Terminal extends Component<Props, State> {
             onClose={this.closeComposer}
           />
         )}
-        <button
-          class={`voice-composer-toggle ${
-            this.touchCapable && !showComposer && !showKeyboard
-              ? 'voice-composer-toggle--visible'
-              : ''
-          }`}
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={this.openComposer}
-          title="Open input and paste composer"
-          aria-label="Open input and paste composer"
-          aria-hidden={!this.touchCapable || showComposer || showKeyboard}
-          tabIndex={this.touchCapable && !showComposer && !showKeyboard ? 0 : -1}
-        >
-          <span aria-hidden="true">I/P</span>
-        </button>
-        {!showKeyboard && (
+        {this.touchCapable &&
+          !showComposer &&
+          !showKeyboard &&
+          !softwareKeyboardOpen && (
+            <TerminalLauncher
+              onOpenKeyboard={this.openKeyboard}
+              onOpenComposer={this.openComposer}
+            />
+          )}
+        {!this.touchCapable && !showKeyboard && (
           <button
-            class={`keyboard-toggle ${
-              softwareKeyboardOpen ? 'keyboard-toggle--software-open' : ''
-            }`}
+            class="keyboard-toggle"
             onMouseDown={(event) => event.preventDefault()}
-            onClick={this.toggleKeyboard}
+            onClick={this.openKeyboard}
             title="Open web keyboard"
             aria-label="Open web keyboard"
           >
@@ -206,6 +199,13 @@ export class Terminal extends Component<Props, State> {
     const showKeyboard = !this.state.showKeyboard;
     this.xterm.setWebKeyboardActive(showKeyboard);
     this.setState({showKeyboard});
+  }
+
+  @bind
+  openKeyboard() {
+    if (this.state.showKeyboard) return;
+    this.xterm.setWebKeyboardActive(true);
+    this.setState({showKeyboard: true});
   }
 
   private handleWebKeyboardHeight = (webKeyboardHeight: number) => {

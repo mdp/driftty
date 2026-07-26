@@ -1,0 +1,102 @@
+$void: #05080b;
+$cyan: #59f3ff;
+$green: #76ffb5;
+$magenta: #ff56d8;
+
+.terminal-launcher {
+  position: absolute;
+  z-index: 1001;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: $cyan;
+  background: linear-gradient(135deg, rgba(15, 33, 39, 0.97), rgba(5, 9, 12, 0.98));
+  border: 0;
+  box-shadow:
+    inset 0 0 0 1px rgba($cyan, 0.68),
+    inset 0 0 13px rgba($cyan, 0.08),
+    0 4px 18px rgba(0, 0, 0, 0.75),
+    0 0 12px rgba($cyan, 0.14);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
+
+  &--top-left {
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+  }
+
+  &--top-right {
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+  }
+
+  &--bottom-left {
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(12px, env(safe-area-inset-left));
+  }
+
+  &--bottom-right {
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  &--dragging {
+    z-index: 1600;
+    cursor: grabbing;
+    opacity: 0.92;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $cyan;
+    outline-offset: 3px;
+  }
+
+  &__screen {
+    position: absolute;
+    inset: 9px 7px 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba($cyan, 0.5);
+    box-shadow: inset 0 0 8px rgba($cyan, 0.08);
+
+    span {
+      font: 800 14px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      letter-spacing: -0.08em;
+      text-shadow: 0 0 7px rgba($cyan, 0.75);
+    }
+  }
+
+  &__signal {
+    position: absolute;
+    top: 5px;
+    right: 6px;
+    width: 4px;
+    height: 4px;
+    background: $green;
+    border-radius: 50%;
+    box-shadow: 0 0 6px $green;
+  }
+
+  &::before {
+    position: absolute;
+    top: 4px;
+    left: 5px;
+    width: 11px;
+    height: 2px;
+    content: '';
+    background: $magenta;
+    box-shadow: 0 0 7px rgba($magenta, 0.8);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .terminal-launcher {
+    display: none;
+  }
+}
