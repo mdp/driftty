@@ -1,8 +1,16 @@
 export type ComposerAction = 'insert' | 'insert-return';
 
-export function composerPayloads(
+export interface ComposerSubmission {
+  text: string;
+  enter: boolean;
+}
+
+export function composerSubmission(
   value: string,
   action: ComposerAction,
-): string[] {
-  return action === 'insert-return' ? [value, '\r'] : [value];
+): ComposerSubmission {
+  return {
+    text: value,
+    enter: action === 'insert-return',
+  };
 }

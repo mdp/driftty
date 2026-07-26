@@ -1,12 +1,16 @@
 import { Component, h } from 'preact';
 import { bind } from 'decko';
-import { composerPayloads, type ComposerAction } from './actions';
+import {
+  composerSubmission,
+  type ComposerAction,
+  type ComposerSubmission,
+} from './actions';
 import './voice-composer.scss';
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
-  onSend: (payloads: string[]) => void;
+  onSend: (submission: ComposerSubmission) => void;
   onClose: () => void;
 }
 
@@ -42,8 +46,8 @@ export class VoiceComposer extends Component<Props, State> {
       >
         <header class="voice-composer__header">
           <span class="voice-composer__signal" aria-hidden="true" />
-          <span id="voice-composer-title">VOICE INPUT</span>
-          <span class="voice-composer__native">iOS DICTATION READY</span>
+          <span id="voice-composer-title">INPUT / PASTE</span>
+          <span class="voice-composer__native">TYPE · PASTE · DICTATE</span>
         </header>
         <textarea
           ref={(element) => {
@@ -60,8 +64,8 @@ export class VoiceComposer extends Component<Props, State> {
           autoCapitalize="sentences"
           autoCorrect="on"
           spellcheck
-          placeholder="Tap the microphone on the iOS keyboard and speak…"
-          aria-label="Dictated terminal input"
+          placeholder="Long-press to paste, type, or use keyboard dictation…"
+          aria-label="Terminal input and paste composer"
         />
         <div class="voice-composer__actions">
           <button type="button" onClick={() => this.send('insert')}>
@@ -92,7 +96,7 @@ export class VoiceComposer extends Component<Props, State> {
   private send(action: ComposerAction) {
     const { value, onSend } = this.props;
     if (!value && action === 'insert') return;
-    onSend(composerPayloads(value, action));
+    onSend(composerSubmission(value, action));
   }
 
   @bind

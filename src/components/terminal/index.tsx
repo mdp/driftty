@@ -4,6 +4,8 @@ import { Xterm, XtermOptions } from './xterm';
 import { KeyboardOverlay } from '../keyboard-overlay';
 import { VoiceComposer } from '../voice-composer';
 import {measureVisualViewport} from '../../visual-viewport';
+import {isTouchCapable} from '../../touch-input';
+import type {ComposerSubmission} from '../voice-composer/actions';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -27,6 +29,7 @@ export class Terminal extends Component<Props, State> {
   private xterm: Xterm;
   private layoutHeight = window.innerHeight;
   private layoutWidth = window.innerWidth;
+  private readonly touchCapable = isTouchCapable(navigator);
 
   constructor(props: Props) {
     super();
@@ -106,11 +109,6 @@ export class Terminal extends Component<Props, State> {
           style={{
             height: `${Math.max(0, viewportHeight - webKeyboardHeight)}px`,
           }}
-          onPointerDownCapture={(event) => {
-            if (!showKeyboard) return;
-            event.preventDefault();
-            this.xterm.setWebKeyboardActive(true);
-          }}
           ref={(c) => {
             this.container = c as HTMLElement;
           }}
@@ -139,28 +137,18 @@ export class Terminal extends Component<Props, State> {
         )}
         <button
           class={`voice-composer-toggle ${
-            softwareKeyboardOpen && !showComposer
+            this.touchCapable && !showComposer
               ? 'voice-composer-toggle--visible'
               : ''
           }`}
           onMouseDown={(event) => event.preventDefault()}
           onClick={this.openComposer}
-          title="Open voice input"
-          aria-label="Open voice input"
-          aria-hidden={!softwareKeyboardOpen || showComposer}
-          tabIndex={softwareKeyboardOpen && !showComposer ? 0 : -1}
+          title="Open input and paste composer"
+          aria-label="Open input and paste composer"
+          aria-hidden={!this.touchCapable || showComposer}
+          tabIndex={this.touchCapable && !showComposer ? 0 : -1}
         >
-          <svg
-            viewBox="0 0 24 24"
-            width="22"
-            height="22"
-            aria-hidden="true"
-          >
-            <path
-              fill="currentColor"
-              d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12h-2Z"
-            />
-          </svg>
+          <span aria-hidden="true">I/P</span>
         </button>
         <button
           class={`keyboard-toggle ${
@@ -201,7 +189,6 @@ export class Terminal extends Component<Props, State> {
 
   @bind
   openComposer() {
-    this.xterm.setWebKeyboardActive(false);
     this.setState({ showComposer: true, showKeyboard: false });
   }
 
@@ -216,10 +203,9 @@ export class Terminal extends Component<Props, State> {
   }
 
   @bind
-  sendComposer(payloads: string[]) {
-    for (const payload of payloads) {
-      this.xterm.sendData(payload);
-    }
+  sendComposer({text, enter}: ComposerSubmission) {
+    this.xterm.paste(text);
+    if (enter) this.xterm.sendData('\r');
     this.setState(
       { showComposer: false, composerValue: '' },
       () => this.xterm.focus(),

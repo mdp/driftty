@@ -18,6 +18,10 @@ import {
   reconnectDelay,
   storeAutoReconnect,
 } from '../../../reconnect';
+import {
+  isTouchCapable,
+  setNativeInputDisabled,
+} from '../../../touch-input';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -117,6 +121,10 @@ export class Xterm {
   private reconnectListener?: (needsManualReconnect: boolean) => void;
   private inputModifier?: InputModifier;
   private modifierListener?: (modifier?: InputModifier) => void;
+  private readonly touchCapable = isTouchCapable(
+    typeof navigator === 'undefined' ? undefined : navigator,
+  );
+  private webKeyboardActive = false;
 
   private writeFunc = (data: ArrayBuffer) =>
     this.writeData(new Uint8Array(data));
@@ -140,19 +148,28 @@ export class Xterm {
   }
 
   public focus() {
+    if (this.touchCapable) return;
     this.terminal?.focus();
   }
 
   public setWebKeyboardActive(active: boolean) {
+    this.webKeyboardActive = active;
+    this.applyNativeInputState();
+  }
+
+  private applyNativeInputState() {
     const textarea = this.terminal?.element?.querySelector(
       '.xterm-helper-textarea'
     ) as HTMLTextAreaElement | null;
     if (!textarea) return;
+    setNativeInputDisabled(
+      textarea,
+      this.touchCapable || this.webKeyboardActive,
+    );
+  }
 
-    textarea.disabled = active;
-    textarea.readOnly = active;
-    textarea.inputMode = active ? 'none' : 'text';
-    if (active) textarea.blur();
+  public isNativeInputDisabled() {
+    return this.touchCapable || this.webKeyboardActive;
   }
 
   public armInputModifier(modifier: InputModifier) {
@@ -264,6 +281,7 @@ export class Xterm {
     terminal.loadAddon(webLinksAddon);
 
     terminal.open(parent);
+    this.applyNativeInputState();
     fitAddon.fit();
   }
 
@@ -359,6 +377,11 @@ export class Xterm {
     }
   }
 
+  public paste(data: string) {
+    if (!data) return;
+    this.terminal.paste(data);
+  }
+
   @bind
   public connect() {
     if (this.disposed) return;
@@ -390,6 +413,7 @@ export class Xterm {
     if (this.opened) {
       terminal.reset();
       terminal.options.disableStdin = false;
+      this.applyNativeInputState();
       overlayAddon.showOverlay('Reconnected', 300);
     } else {
       this.opened = true;
@@ -401,7 +425,7 @@ export class Xterm {
     this.manualReconnectKey = undefined;
     this.reconnectListener?.(false);
     this.initListeners();
-    terminal.focus();
+    this.focus();
   }
 
   @bind
@@ -594,6 +618,7 @@ export class Xterm {
           break;
       }
     }
+    this.applyNativeInputState();
   }
 
   @bind

@@ -1,22 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import { composerPayloads } from './actions';
+import { composerSubmission } from './actions';
 
-describe('composerPayloads', () => {
+describe('composerSubmission', () => {
   it('inserts dictated text without executing it', () => {
-    expect(composerPayloads('git status', 'insert')).toEqual(['git status']);
+    expect(composerSubmission('git status', 'insert')).toEqual({
+      text: 'git status',
+      enter: false,
+    });
   });
 
   it('sends Enter separately so terminal input is executed, not pasted', () => {
-    expect(composerPayloads('git status', 'insert-return')).toEqual([
-      'git status',
-      '\r',
-    ]);
+    expect(composerSubmission('git status', 'insert-return')).toEqual({
+      text: 'git status',
+      enter: true,
+    });
   });
 
   it('preserves multiline text', () => {
-    expect(composerPayloads('first\nsecond', 'insert-return')).toEqual([
-      'first\nsecond',
-      '\r',
-    ]);
+    expect(composerSubmission('first\nsecond', 'insert-return')).toEqual({
+      text: 'first\nsecond',
+      enter: true,
+    });
+  });
+
+  it('supports empty insertion and empty insertion followed by Enter', () => {
+    expect(composerSubmission('', 'insert')).toEqual({ text: '', enter: false });
+    expect(composerSubmission('', 'insert-return')).toEqual({
+      text: '',
+      enter: true,
+    });
   });
 });

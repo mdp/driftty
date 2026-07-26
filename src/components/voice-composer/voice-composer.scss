@@ -159,7 +159,8 @@ $danger: #ff5d7d;
   box-shadow:
     0 0 18px rgba(0, 0, 0, 0.72),
     0 0 12px rgba($magenta, 0.16);
-  font-size: 21px;
+  font: 800 12px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  letter-spacing: 0.04em;
   cursor: pointer;
   touch-action: manipulation;
   clip-path: polygon(
