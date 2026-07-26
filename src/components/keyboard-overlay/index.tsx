@@ -1,5 +1,4 @@
 import {Component, h} from 'preact';
-import {clampFontSize} from '../../font-size';
 import {Xterm} from '../terminal/xterm';
 import {
   agentKeys,
@@ -20,6 +19,7 @@ interface Props {
   terminal: Xterm;
   show: boolean;
   onToggle: () => void;
+  onOpenComposer: () => void;
   onHeightChange: (height: number) => void;
 }
 
@@ -27,7 +27,6 @@ type Section = 'agent' | 'nav' | 'ctrl' | 'tmux' | 'tmux-scroll';
 type KeyboardLayer = 'letters' | 'symbols';
 
 interface State {
-  fontSize: number;
   modifier?: InputModifier;
   section: Section;
   autoReconnect: boolean;
@@ -40,9 +39,7 @@ export class KeyboardOverlay extends Component<Props, State> {
 
   constructor(props: Props) {
     super(props);
-    const terminal = props.terminal?.getTerminal();
     this.state = {
-      fontSize: terminal?.options?.fontSize || 13,
       section: 'agent',
       autoReconnect: props.terminal.isAutoReconnectEnabled(),
       layer: 'letters',
@@ -111,22 +108,6 @@ export class KeyboardOverlay extends Component<Props, State> {
   private exitTmuxScroll = () => {
     this.sendKey(sequences.tmuxScrollExit);
     this.setState({section: 'tmux'});
-  };
-
-  private adjustFontSize = (delta: number) => {
-    const term = this.props.terminal?.getTerminal();
-    if (!term) return;
-
-    const newSize = clampFontSize((term.options.fontSize || 13) + delta);
-    term.options.fontSize = newSize;
-    this.setState({fontSize: newSize});
-    this.props.terminal.fit();
-
-    try {
-      localStorage.setItem('ttyd-font-size', newSize.toString());
-    } catch {
-      // Storage can be disabled in privacy-focused browsers.
-    }
   };
 
   private toggleAutoReconnect = () => {
@@ -391,17 +372,11 @@ export class KeyboardOverlay extends Component<Props, State> {
           ))}
           <button
             class="keyboard-overlay__tab"
-            onClick={() => this.adjustFontSize(-1)}
-            title="Decrease font size"
+            onClick={this.props.onOpenComposer}
+            title="Open Input and Paste"
+            aria-label="Open Input and Paste"
           >
-            A−
-          </button>
-          <button
-            class="keyboard-overlay__tab"
-            onClick={() => this.adjustFontSize(1)}
-            title="Increase font size"
-          >
-            A+
+            I/P
           </button>
           <button
             class="keyboard-overlay__tab"

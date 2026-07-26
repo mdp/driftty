@@ -124,6 +124,7 @@ export class Terminal extends Component<Props, State> {
           terminal={this.xterm}
           show={showKeyboard && !showComposer}
           onToggle={this.toggleKeyboard}
+          onOpenComposer={this.openComposer}
           onHeightChange={this.handleWebKeyboardHeight}
         />
         {touchSelection && (
