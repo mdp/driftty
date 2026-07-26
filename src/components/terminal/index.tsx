@@ -137,7 +137,7 @@ export class Terminal extends Component<Props, State> {
         )}
         <button
           class={`voice-composer-toggle ${
-            this.touchCapable && !showComposer
+            this.touchCapable && !showComposer && !showKeyboard
               ? 'voice-composer-toggle--visible'
               : ''
           }`}
@@ -145,8 +145,8 @@ export class Terminal extends Component<Props, State> {
           onClick={this.openComposer}
           title="Open input and paste composer"
           aria-label="Open input and paste composer"
-          aria-hidden={!this.touchCapable || showComposer}
-          tabIndex={this.touchCapable && !showComposer ? 0 : -1}
+          aria-hidden={!this.touchCapable || showComposer || showKeyboard}
+          tabIndex={this.touchCapable && !showComposer && !showKeyboard ? 0 : -1}
         >
           <span aria-hidden="true">I/P</span>
         </button>
