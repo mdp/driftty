@@ -69,14 +69,28 @@ $magenta: #ff56d8;
     border: 0;
 
     & + & {
-      color: $green;
+      color: $magenta;
       border-left: 1px solid rgba($cyan, 0.32);
-      text-shadow: 0 0 7px rgba($green, 0.55);
+      filter: drop-shadow(0 0 4px rgba($magenta, 0.65));
     }
 
     &:focus-visible {
       outline: 2px solid $cyan;
       outline-offset: -3px;
+    }
+  }
+
+  &__microphone {
+    width: 20px;
+    height: 20px;
+    overflow: visible;
+    fill: currentColor;
+
+    path {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
     }
   }
 

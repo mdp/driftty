@@ -1,4 +1,4 @@
-import {Component, h} from 'preact';
+import {Component, h, type ComponentChildren} from 'preact';
 import {
   loadLauncherCorner,
   resolveLauncherCorner,
@@ -54,14 +54,25 @@ export class TerminalLauncher extends Component<Props, State> {
       >
         <span class="terminal-launcher__signal" aria-hidden="true" />
         {this.renderButton('keyboard', '>_', 'Open web keyboard')}
-        {this.renderButton('composer', 'I/P', 'Open Input and Paste')}
+        {this.renderButton(
+          'composer',
+          <svg
+            class="terminal-launcher__microphone"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <rect x="9" y="3" width="6" height="11" rx="3" />
+            <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M9 21h6" />
+          </svg>,
+          'Open Input and Paste'
+        )}
       </div>
     );
   }
 
   private renderButton(
     action: LauncherAction,
-    label: string,
+    label: ComponentChildren,
     accessibleLabel: string
   ) {
     return (
