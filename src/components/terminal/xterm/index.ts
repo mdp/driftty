@@ -121,6 +121,9 @@ export class Xterm {
   private reconnectListener?: (needsManualReconnect: boolean) => void;
   private inputModifier?: InputModifier;
   private modifierListener?: (modifier?: InputModifier) => void;
+  private selectionMenuListener?: (x: number, y: number) => void;
+  private selectionGestureDisposables: IDisposable[] = [];
+  private suppressSelectionCopy = false;
   private readonly touchCapable = isTouchCapable(
     typeof navigator === 'undefined' ? undefined : navigator,
   );
@@ -188,6 +191,23 @@ export class Xterm {
     this.modifierListener = listener;
   }
 
+  public onSelectionMenu(
+    listener?: (x: number, y: number) => void
+  ) {
+    this.selectionMenuListener = listener;
+  }
+
+  public async copySelection() {
+    const selection = this.terminal?.getSelection();
+    if (!selection) return;
+    try {
+      await navigator.clipboard.writeText(selection);
+    } catch {
+      document.execCommand('copy');
+    }
+    this.overlayAddon?.showOverlay('\u2702', 300);
+  }
+
   private clearListeners() {
     for (const d of this.disposables) {
       d.dispose();
@@ -200,6 +220,10 @@ export class Xterm {
     clearTimeout(this.reconnectTimer);
     this.manualReconnectKey?.dispose();
     this.clearListeners();
+    for (const disposable of this.selectionGestureDisposables) {
+      disposable.dispose();
+    }
+    this.selectionGestureDisposables.length = 0;
     this.socket?.close();
   }
 
@@ -282,7 +306,81 @@ export class Xterm {
 
     terminal.open(parent);
     this.applyNativeInputState();
+    this.initTouchSelection();
     fitAddon.fit();
+  }
+
+  private initTouchSelection() {
+    if (!this.touchCapable || !this.terminal.element) return;
+    const element = this.terminal.element;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let startX = 0;
+    let startY = 0;
+
+    const cancel = () => {
+      clearTimeout(timer);
+      timer = undefined;
+    };
+    const pointerDown = (rawEvent: Event) => {
+      const event = rawEvent as PointerEvent;
+      if (event.pointerType !== 'touch' || event.button !== 0) return;
+      startX = event.clientX;
+      startY = event.clientY;
+      cancel();
+      timer = setTimeout(() => {
+        timer = undefined;
+        if (!this.selectWordAt(startX, startY)) return;
+        this.selectionMenuListener?.(startX, startY);
+        navigator.vibrate?.(15);
+      }, 525);
+    };
+    const pointerMove = (rawEvent: Event) => {
+      const event = rawEvent as PointerEvent;
+      if (
+        Math.hypot(event.clientX - startX, event.clientY - startY) > 12
+      ) {
+        cancel();
+      }
+    };
+
+    this.selectionGestureDisposables.push(
+      addEventListener(element, 'pointerdown', pointerDown),
+      addEventListener(element, 'pointermove', pointerMove),
+      addEventListener(element, 'pointerup', cancel),
+      addEventListener(element, 'pointercancel', cancel),
+    );
+  }
+
+  private selectWordAt(clientX: number, clientY: number) {
+    const screen = this.terminal.element?.querySelector(
+      '.xterm-screen'
+    ) as HTMLElement | null;
+    if (!screen) return false;
+    const bounds = screen.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return false;
+
+    const column = Math.min(
+      this.terminal.cols - 1,
+      Math.max(0, Math.floor((clientX - bounds.left) / bounds.width * this.terminal.cols)),
+    );
+    const viewportRow = Math.min(
+      this.terminal.rows - 1,
+      Math.max(0, Math.floor((clientY - bounds.top) / bounds.height * this.terminal.rows)),
+    );
+    const row = this.terminal.buffer.active.viewportY + viewportRow;
+    const line = this.terminal.buffer.active.getLine(row);
+    if (!line) return false;
+    const text = line.translateToString(true);
+    if (!text || column >= text.length) return false;
+
+    const isBoundary = (character: string) => /\s/.test(character);
+    let start = column;
+    let end = column + 1;
+    while (start > 0 && !isBoundary(text[start - 1])) start--;
+    while (end < text.length && !isBoundary(text[end])) end++;
+    this.suppressSelectionCopy = true;
+    this.terminal.select(start, row, end - start);
+    return true;
   }
 
   @bind
@@ -324,6 +422,10 @@ export class Xterm {
     register(
       terminal.onSelectionChange(() => {
         if (this.terminal.getSelection() === '') return;
+        if (this.suppressSelectionCopy) {
+          this.suppressSelectionCopy = false;
+          return;
+        }
         try {
           document.execCommand('copy');
         } catch (e) {

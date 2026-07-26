@@ -36,6 +36,7 @@ interface State {
 
 export class KeyboardOverlay extends Component<Props, State> {
   private resizeObserver?: ResizeObserver;
+  private handledTouchPress = false;
 
   constructor(props: Props) {
     super(props);
@@ -159,8 +160,18 @@ export class KeyboardOverlay extends Component<Props, State> {
     <button
       key={`${label}-${value}`}
       class={`keyboard-overlay__key ${className}`}
-      onMouseDown={(event) => event.preventDefault()}
-      onClick={() => this.typeCharacter(value)}
+      onPointerDown={(event) => {
+        if (event.pointerType !== 'touch') return;
+        this.handledTouchPress = true;
+        this.typeCharacter(value);
+      }}
+      onClick={() => {
+        if (this.handledTouchPress) {
+          this.handledTouchPress = false;
+          return;
+        }
+        this.typeCharacter(value);
+      }}
       aria-label={label}
     >
       {label}

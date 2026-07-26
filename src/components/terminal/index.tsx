@@ -22,6 +22,7 @@ interface State {
   composerValue: string;
   reconnectRequired: boolean;
   webKeyboardHeight: number;
+  selectionMenu?: {x: number; y: number};
 }
 
 export class Terminal extends Component<Props, State> {
@@ -54,6 +55,9 @@ export class Terminal extends Component<Props, State> {
     this.xterm.onReconnectRequired((reconnectRequired) =>
       this.setState({reconnectRequired})
     );
+    this.xterm.onSelectionMenu((x, y) =>
+      this.setState({selectionMenu: {x, y}})
+    );
     await this.xterm.refreshToken();
     this.xterm.open(this.container);
     this.xterm.connect();
@@ -80,6 +84,7 @@ export class Terminal extends Component<Props, State> {
     );
     window.removeEventListener('resize', this.handleViewportChange);
     this.xterm.onReconnectRequired();
+    this.xterm.onSelectionMenu();
     this.xterm.dispose();
   }
 
@@ -94,6 +99,7 @@ export class Terminal extends Component<Props, State> {
       composerValue,
       reconnectRequired,
       webKeyboardHeight,
+      selectionMenu,
     }: State
   ) {
     return (
@@ -119,6 +125,16 @@ export class Terminal extends Component<Props, State> {
           onToggle={this.toggleKeyboard}
           onHeightChange={this.handleWebKeyboardHeight}
         />
+        {selectionMenu && (
+          <button
+            class="terminal-selection-copy"
+            style={{left: `${selectionMenu.x}px`, top: `${selectionMenu.y}px`}}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={this.copySelection}
+          >
+            Copy
+          </button>
+        )}
         {reconnectRequired && (
           <button
             class="reconnect-button"
@@ -185,6 +201,11 @@ export class Terminal extends Component<Props, State> {
         this.xterm.scrollToBottom();
       })
     );
+  };
+
+  private copySelection = async () => {
+    await this.xterm.copySelection();
+    this.setState({selectionMenu: undefined});
   };
 
   @bind

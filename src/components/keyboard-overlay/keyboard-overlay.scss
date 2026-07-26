@@ -242,7 +242,7 @@ $cut: 8px;
   &__key-row {
     display: flex;
     justify-content: center;
-    gap: 4px;
+    gap: 1px;
 
     &--1 {
       padding-inline: 4%;
@@ -260,8 +260,8 @@ $cut: 8px;
   &__key {
     flex: 1 1 0;
     min-width: 0;
-    height: clamp(38px, 6.2vh, 50px);
-    padding: 0 2px;
+    height: clamp(44px, 6.8vh, 54px);
+    padding: 0 3px;
     color: #e0eeee;
     background: linear-gradient(180deg, #24343a, #111b20);
     border: 0;
@@ -548,7 +548,7 @@ $cut: 8px;
     }
 
     &__key {
-      height: 35px;
+      height: 40px;
     }
 
     &__special-keys .keyboard-overlay__button {

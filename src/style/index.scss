@@ -73,6 +73,32 @@ body {
   clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
 }
 
+.terminal-selection-copy {
+  position: fixed;
+  z-index: 1500;
+  min-width: 74px;
+  padding: 9px 16px;
+  color: #fff;
+  background: rgba(35, 35, 38, 0.96);
+  border: 0;
+  border-radius: 9px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  font: 600 15px/1.1 -apple-system, BlinkMacSystemFont, sans-serif;
+  transform: translate(-50%, calc(-100% - 14px));
+  touch-action: manipulation;
+
+  &::after {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    content: '';
+    background: inherit;
+    transform: translate(-50%, -5px) rotate(45deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .terminal-shell::after {
     background: none;
