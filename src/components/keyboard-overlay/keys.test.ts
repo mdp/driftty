@@ -73,6 +73,7 @@ describe('one-shot modifiers', () => {
   it('supports uppercase characters and back-tab through Shift', () => {
     expect(applyInputModifier('a', 'shift')).toBe('A');
     expect(applyInputModifier('\t', 'shift')).toBe('\x1b[Z');
+    expect(applyInputModifier('\r', 'shift')).toBe('\n');
   });
 
   it('leaves shell symbols intact when shift is armed', () => {

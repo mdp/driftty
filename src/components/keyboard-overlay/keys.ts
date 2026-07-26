@@ -132,6 +132,7 @@ export function applyInputModifier(
 ): string {
   if (modifier === 'shift') {
     if (data === sequences.tab) return sequences.shiftTab;
+    if (data === '\r') return '\n';
     return data.length === 1 ? data.toUpperCase() : data;
   }
 

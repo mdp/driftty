@@ -150,22 +150,22 @@ export class Terminal extends Component<Props, State> {
         >
           <span aria-hidden="true">I/P</span>
         </button>
-        <button
-          class={`keyboard-toggle ${
-            showKeyboard ? 'keyboard-toggle--active' : ''
-          } ${
-            softwareKeyboardOpen ? 'keyboard-toggle--software-open' : ''
-          }`}
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={this.toggleKeyboard}
-          title="Toggle keyboard overlay"
-          aria-label="Toggle terminal controls"
-        >
-          <span class="keyboard-toggle__signal" aria-hidden="true" />
-          <span class="keyboard-toggle__prompt" aria-hidden="true">
-            &gt;_
-          </span>
-        </button>
+        {!showKeyboard && (
+          <button
+            class={`keyboard-toggle ${
+              softwareKeyboardOpen ? 'keyboard-toggle--software-open' : ''
+            }`}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={this.toggleKeyboard}
+            title="Open web keyboard"
+            aria-label="Open web keyboard"
+          >
+            <span class="keyboard-toggle__signal" aria-hidden="true" />
+            <span class="keyboard-toggle__prompt" aria-hidden="true">
+              &gt;_
+            </span>
+          </button>
+        )}
       </div>
     );
   }

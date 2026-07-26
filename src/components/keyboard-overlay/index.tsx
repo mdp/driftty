@@ -179,12 +179,32 @@ export class KeyboardOverlay extends Component<Props, State> {
             class={`keyboard-overlay__key-row keyboard-overlay__key-row--${rowIndex}`}
             key={`${layer}-${rowIndex}`}
           >
+            {layer === 'letters' && rowIndex === 2 ? (
+              <button
+                class={`keyboard-overlay__key keyboard-overlay__key--modifier keyboard-overlay__key--icon keyboard-overlay__key--edge ${
+                  modifier === 'shift' ? 'keyboard-overlay__key--latched' : ''
+                }`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => this.toggleModifier('shift')}
+                aria-label="Shift"
+                aria-pressed={modifier === 'shift'}
+              >
+                ⇧
+              </button>
+            ) : null}
             {row.map(({label, value}) =>
               this.renderTypingKey(
                 shifted ? label.toUpperCase() : label,
                 value
               )
             )}
+            {layer === 'letters' && rowIndex === 2
+              ? this.renderTypingKey(
+                  '⌫',
+                  '\x7f',
+                  'keyboard-overlay__key--icon keyboard-overlay__key--edge'
+                )
+              : null}
           </div>
         ))}
         <div class="keyboard-overlay__key-row keyboard-overlay__key-row--actions">
@@ -198,16 +218,19 @@ export class KeyboardOverlay extends Component<Props, State> {
           >
             Ctrl
           </button>
-          <button
-            class={`keyboard-overlay__key keyboard-overlay__key--modifier ${
-              modifier === 'shift' ? 'keyboard-overlay__key--latched' : ''
-            }`}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => this.toggleModifier('shift')}
-            aria-pressed={modifier === 'shift'}
-          >
-            ⇧
-          </button>
+          {layer === 'symbols' ? (
+            <button
+              class={`keyboard-overlay__key keyboard-overlay__key--modifier keyboard-overlay__key--icon ${
+                modifier === 'shift' ? 'keyboard-overlay__key--latched' : ''
+              }`}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => this.toggleModifier('shift')}
+              aria-label="Shift"
+              aria-pressed={modifier === 'shift'}
+            >
+              ⇧
+            </button>
+          ) : null}
           <button
             class={`keyboard-overlay__key keyboard-overlay__key--modifier ${
               layer === 'symbols' ? 'keyboard-overlay__key--latched' : ''
@@ -228,8 +251,18 @@ export class KeyboardOverlay extends Component<Props, State> {
             ' ',
             'keyboard-overlay__key--space'
           )}
-          {this.renderTypingKey('⌫', '\x7f', 'keyboard-overlay__key--wide')}
-          {this.renderTypingKey('↵', '\r', 'keyboard-overlay__key--enter')}
+          {layer === 'symbols'
+            ? this.renderTypingKey(
+                '⌫',
+                '\x7f',
+                'keyboard-overlay__key--wide keyboard-overlay__key--icon'
+              )
+            : null}
+          {this.renderTypingKey(
+            shifted ? '⇧↵' : '↵',
+            '\r',
+            'keyboard-overlay__key--enter'
+          )}
         </div>
       </div>
     );

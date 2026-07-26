@@ -249,7 +249,7 @@ $cut: 8px;
     }
 
     &--2 {
-      padding-inline: 9%;
+      padding-inline: 0;
     }
 
     &--actions {
@@ -294,6 +294,17 @@ $cut: 8px;
       color: #9eb9bd;
       font-size: 11px;
       text-transform: uppercase;
+    }
+
+    &--icon {
+      font-size: clamp(20px, 6vw, 27px);
+      line-height: 1;
+    }
+
+    &--edge {
+      flex: 1.35 1 0;
+      max-width: 58px;
+      color: $cyan;
     }
 
     &--latched {
