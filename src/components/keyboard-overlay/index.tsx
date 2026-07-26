@@ -371,12 +371,19 @@ export class KeyboardOverlay extends Component<Props, State> {
             </button>
           ))}
           <button
-            class="keyboard-overlay__tab"
+            class="keyboard-overlay__tab keyboard-overlay__tab--composer"
             onClick={this.props.onOpenComposer}
             title="Open Input and Paste"
             aria-label="Open Input and Paste"
           >
-            I/P
+            <svg
+              class="keyboard-overlay__microphone"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M9 21h6" />
+            </svg>
           </button>
           <button
             class="keyboard-overlay__tab"

@@ -184,6 +184,26 @@ $cut: 8px;
         box-shadow: 0 0 8px $magenta;
       }
     }
+
+    &--composer {
+      color: $magenta;
+      filter: drop-shadow(0 0 4px rgba($magenta, 0.55));
+    }
+  }
+
+  &__microphone {
+    width: 19px;
+    height: 19px;
+    overflow: visible;
+    vertical-align: middle;
+    fill: currentColor;
+
+    path {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+    }
   }
 
   &__buttons {
