@@ -1,6 +1,6 @@
 import { bind } from 'decko';
 import { Component, h } from 'preact';
-import { Xterm, XtermOptions } from './xterm';
+import {TouchSelectionBox, Xterm, XtermOptions} from './xterm';
 import { KeyboardOverlay } from '../keyboard-overlay';
 import { VoiceComposer } from '../voice-composer';
 import {measureVisualViewport} from '../../visual-viewport';
@@ -22,7 +22,7 @@ interface State {
   composerValue: string;
   reconnectRequired: boolean;
   webKeyboardHeight: number;
-  selectionMenu?: {x: number; y: number};
+  touchSelection?: TouchSelectionBox;
 }
 
 export class Terminal extends Component<Props, State> {
@@ -55,8 +55,8 @@ export class Terminal extends Component<Props, State> {
     this.xterm.onReconnectRequired((reconnectRequired) =>
       this.setState({reconnectRequired})
     );
-    this.xterm.onSelectionMenu((x, y) =>
-      this.setState({selectionMenu: {x, y}})
+    this.xterm.onTouchSelection((touchSelection) =>
+      this.setState({touchSelection})
     );
     await this.xterm.refreshToken();
     this.xterm.open(this.container);
@@ -84,7 +84,7 @@ export class Terminal extends Component<Props, State> {
     );
     window.removeEventListener('resize', this.handleViewportChange);
     this.xterm.onReconnectRequired();
-    this.xterm.onSelectionMenu();
+    this.xterm.onTouchSelection();
     this.xterm.dispose();
   }
 
@@ -99,7 +99,7 @@ export class Terminal extends Component<Props, State> {
       composerValue,
       reconnectRequired,
       webKeyboardHeight,
-      selectionMenu,
+      touchSelection,
     }: State
   ) {
     return (
@@ -125,15 +125,30 @@ export class Terminal extends Component<Props, State> {
           onToggle={this.toggleKeyboard}
           onHeightChange={this.handleWebKeyboardHeight}
         />
-        {selectionMenu && (
-          <button
-            class="terminal-selection-copy"
-            style={{left: `${selectionMenu.x}px`, top: `${selectionMenu.y}px`}}
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={this.copySelection}
+        {touchSelection && (
+          <div
+            class={`terminal-touch-selection ${
+              touchSelection.complete
+                ? 'terminal-touch-selection--complete'
+                : ''
+            }`}
+            style={{
+              left: `${touchSelection.left}px`,
+              top: `${touchSelection.top - viewportOffsetTop}px`,
+              width: `${touchSelection.width}px`,
+              height: `${touchSelection.height}px`,
+            }}
           >
-            Copy
-          </button>
+            {touchSelection.complete && (
+              <button
+                class="terminal-selection-copy"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={this.copySelection}
+              >
+                Copy
+              </button>
+            )}
+          </div>
         )}
         {reconnectRequired && (
           <button
@@ -204,12 +219,12 @@ export class Terminal extends Component<Props, State> {
   };
 
   private copySelection = async () => {
-    await this.xterm.copySelection();
-    this.setState({selectionMenu: undefined});
+    await this.xterm.copyTouchSelection();
   };
 
   @bind
   openComposer() {
+    this.xterm.setWebKeyboardActive(false);
     this.setState({ showComposer: true, showKeyboard: false });
   }
 

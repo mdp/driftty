@@ -25,11 +25,9 @@ export class VoiceComposer extends Component<Props, State> {
   state: State = { copied: false };
 
   componentDidMount() {
-    requestAnimationFrame(() => {
-      this.textarea?.focus();
-      const end = this.textarea?.value.length ?? 0;
-      this.textarea?.setSelectionRange(end, end);
-    });
+    this.textarea?.focus();
+    const end = this.textarea?.value.length ?? 0;
+    this.textarea?.setSelectionRange(end, end);
   }
 
   componentWillUnmount() {
@@ -54,6 +52,7 @@ export class VoiceComposer extends Component<Props, State> {
             this.textarea = element ?? undefined;
           }}
           class="voice-composer__input"
+          autoFocus
           value={value}
           onInput={(event) =>
             onChange((event.currentTarget as HTMLTextAreaElement).value)

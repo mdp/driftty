@@ -77,6 +77,14 @@ export interface XtermOptions {
   termOptions: ITerminalOptions;
 }
 
+export interface TouchSelectionBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  complete: boolean;
+}
+
 function toDisposable(f: () => void): IDisposable {
   return { dispose: f };
 }
@@ -121,9 +129,9 @@ export class Xterm {
   private reconnectListener?: (needsManualReconnect: boolean) => void;
   private inputModifier?: InputModifier;
   private modifierListener?: (modifier?: InputModifier) => void;
-  private selectionMenuListener?: (x: number, y: number) => void;
+  private touchSelectionListener?: (box?: TouchSelectionBox) => void;
   private selectionGestureDisposables: IDisposable[] = [];
-  private suppressSelectionCopy = false;
+  private touchSelectionText = '';
   private readonly touchCapable = isTouchCapable(
     typeof navigator === 'undefined' ? undefined : navigator,
   );
@@ -191,21 +199,22 @@ export class Xterm {
     this.modifierListener = listener;
   }
 
-  public onSelectionMenu(
-    listener?: (x: number, y: number) => void
+  public onTouchSelection(
+    listener?: (box?: TouchSelectionBox) => void
   ) {
-    this.selectionMenuListener = listener;
+    this.touchSelectionListener = listener;
   }
 
-  public async copySelection() {
-    const selection = this.terminal?.getSelection();
-    if (!selection) return;
+  public async copyTouchSelection() {
+    if (!this.touchSelectionText) return;
     try {
-      await navigator.clipboard.writeText(selection);
+      await navigator.clipboard.writeText(this.touchSelectionText);
     } catch {
-      document.execCommand('copy');
+      return;
     }
     this.overlayAddon?.showOverlay('\u2702', 300);
+    this.touchSelectionText = '';
+    this.touchSelectionListener?.();
   }
 
   private clearListeners() {
@@ -316,71 +325,148 @@ export class Xterm {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let startX = 0;
     let startY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    let selecting = false;
+    let pointerId: number | undefined;
 
     const cancel = () => {
       clearTimeout(timer);
       timer = undefined;
+    };
+    const screenBounds = () =>
+      (
+        this.terminal.element?.querySelector('.xterm-screen') as
+          | HTMLElement
+          | null
+      )?.getBoundingClientRect();
+    const clampPoint = (x: number, y: number) => {
+      const bounds = screenBounds();
+      if (!bounds) return;
+      return {
+        x: Math.min(bounds.right, Math.max(bounds.left, x)),
+        y: Math.min(bounds.bottom, Math.max(bounds.top, y)),
+        bounds,
+      };
+    };
+    const reportBox = (complete: boolean) => {
+      const start = clampPoint(startX, startY);
+      const current = clampPoint(currentX, currentY);
+      if (!start || !current) return;
+      this.touchSelectionListener?.({
+        left: Math.min(start.x, current.x),
+        top: Math.min(start.y, current.y),
+        width: Math.max(2, Math.abs(current.x - start.x)),
+        height: Math.max(2, Math.abs(current.y - start.y)),
+        complete,
+      });
     };
     const pointerDown = (rawEvent: Event) => {
       const event = rawEvent as PointerEvent;
       if (event.pointerType !== 'touch' || event.button !== 0) return;
       startX = event.clientX;
       startY = event.clientY;
+      currentX = startX;
+      currentY = startY;
+      pointerId = event.pointerId;
+      selecting = false;
+      this.touchSelectionText = '';
+      this.touchSelectionListener?.();
       cancel();
       timer = setTimeout(() => {
         timer = undefined;
-        if (!this.selectWordAt(startX, startY)) return;
-        this.selectionMenuListener?.(startX, startY);
+        if (!screenBounds()) return;
+        selecting = true;
+        element.setPointerCapture?.(event.pointerId);
+        reportBox(false);
         navigator.vibrate?.(15);
       }, 525);
     };
     const pointerMove = (rawEvent: Event) => {
       const event = rawEvent as PointerEvent;
-      if (
+      if (event.pointerId !== pointerId) return;
+      currentX = event.clientX;
+      currentY = event.clientY;
+      if (selecting) {
+        event.preventDefault();
+        reportBox(false);
+      } else if (
         Math.hypot(event.clientX - startX, event.clientY - startY) > 12
       ) {
         cancel();
       }
     };
+    const pointerUp = (rawEvent: Event) => {
+      const event = rawEvent as PointerEvent;
+      if (event.pointerId !== pointerId) return;
+      cancel();
+      if (selecting) {
+        currentX = event.clientX;
+        currentY = event.clientY;
+        this.touchSelectionText = this.textInsideBox(
+          startX,
+          startY,
+          currentX,
+          currentY,
+        );
+        if (this.touchSelectionText) reportBox(true);
+        else this.touchSelectionListener?.();
+        element.releasePointerCapture?.(event.pointerId);
+      }
+      selecting = false;
+      pointerId = undefined;
+    };
+    const pointerCancel = () => {
+      cancel();
+      selecting = false;
+      pointerId = undefined;
+      this.touchSelectionText = '';
+      this.touchSelectionListener?.();
+    };
 
     this.selectionGestureDisposables.push(
       addEventListener(element, 'pointerdown', pointerDown),
       addEventListener(element, 'pointermove', pointerMove),
-      addEventListener(element, 'pointerup', cancel),
-      addEventListener(element, 'pointercancel', cancel),
+      addEventListener(element, 'pointerup', pointerUp),
+      addEventListener(element, 'pointercancel', pointerCancel),
     );
   }
 
-  private selectWordAt(clientX: number, clientY: number) {
+  private textInsideBox(
+    startX: number,
+    startY: number,
+    endX: number,
+    endY: number,
+  ) {
     const screen = this.terminal.element?.querySelector(
       '.xterm-screen'
     ) as HTMLElement | null;
-    if (!screen) return false;
+    if (!screen) return '';
     const bounds = screen.getBoundingClientRect();
-    if (!bounds.width || !bounds.height) return false;
-
-    const column = Math.min(
-      this.terminal.cols - 1,
-      Math.max(0, Math.floor((clientX - bounds.left) / bounds.width * this.terminal.cols)),
-    );
-    const viewportRow = Math.min(
-      this.terminal.rows - 1,
-      Math.max(0, Math.floor((clientY - bounds.top) / bounds.height * this.terminal.rows)),
-    );
-    const row = this.terminal.buffer.active.viewportY + viewportRow;
-    const line = this.terminal.buffer.active.getLine(row);
-    if (!line) return false;
-    const text = line.translateToString(true);
-    if (!text || column >= text.length) return false;
-
-    const isBoundary = (character: string) => /\s/.test(character);
-    let start = column;
-    let end = column + 1;
-    while (start > 0 && !isBoundary(text[start - 1])) start--;
-    while (end < text.length && !isBoundary(text[end])) end++;
-    this.suppressSelectionCopy = true;
-    this.terminal.select(start, row, end - start);
-    return true;
+    if (!bounds.width || !bounds.height) return '';
+    const toColumn = (x: number) =>
+      Math.min(
+        this.terminal.cols - 1,
+        Math.max(0, Math.floor((x - bounds.left) / bounds.width * this.terminal.cols)),
+      );
+    const toRow = (y: number) =>
+      Math.min(
+        this.terminal.rows - 1,
+        Math.max(0, Math.floor((y - bounds.top) / bounds.height * this.terminal.rows)),
+      );
+    const firstColumn = Math.min(toColumn(startX), toColumn(endX));
+    const lastColumn = Math.max(toColumn(startX), toColumn(endX));
+    const firstRow = Math.min(toRow(startY), toRow(endY));
+    const lastRow = Math.max(toRow(startY), toRow(endY));
+    const viewportY = this.terminal.buffer.active.viewportY;
+    const lines: string[] = [];
+    for (let row = firstRow; row <= lastRow; row++) {
+      const line = this.terminal.buffer.active.getLine(viewportY + row);
+      lines.push(
+        line?.translateToString(true, firstColumn, lastColumn + 1) ?? '',
+      );
+    }
+    return lines.join('\n').replace(/\s+$/g, '');
   }
 
   @bind
@@ -422,10 +508,6 @@ export class Xterm {
     register(
       terminal.onSelectionChange(() => {
         if (this.terminal.getSelection() === '') return;
-        if (this.suppressSelectionCopy) {
-          this.suppressSelectionCopy = false;
-          return;
-        }
         try {
           document.execCommand('copy');
         } catch (e) {
