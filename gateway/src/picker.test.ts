@@ -1,10 +1,11 @@
 import {describe, expect, test} from 'bun:test';
-import {pickerResponse} from './picker';
+import {pickerResponse, sessionsResponse} from './picker';
 import type {Profile} from './profiles';
 
 const profile = (slug: string, label: string): Profile => ({
   slug, label, host: 'secret.example.net', port: 22, user: 'secret-user',
   key: 'secret-key', keyPath: '/keys/secret-key',
+  sessions: [], sessionRouting: false,
 });
 
 describe('host picker', () => {
@@ -23,5 +24,19 @@ describe('host picker', () => {
     expect(body).not.toContain('secret.example.net');
     expect(body).not.toContain('secret-user');
     expect(body).not.toContain('secret-key');
+  });
+
+  test('shows existing sessions and one-click creation when enabled', async () => {
+    const item = profile('aachen', 'Aachen');
+    item.sessionRouting = true;
+    item.newSessions = {prefix: 'ttyd-', directory: '/home/mdp'};
+    const response = sessionsResponse(item, [{
+      slug: 'clever-turing', name: 'ttyd-clever-turing',
+      label: 'clever-turing', created: 1785140000, attached: 0, managed: true,
+    }]);
+    const body = await response.text();
+    expect(body).toContain('action="/aachen/sessions"');
+    expect(body).toContain('href="/aachen/clever-turing/"');
+    expect(body).toContain('clever-turing');
   });
 });

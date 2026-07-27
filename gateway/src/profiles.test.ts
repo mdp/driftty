@@ -12,7 +12,53 @@ const valid = `profiles:
 describe('profile parsing', () => {
   test('loads a profile and defaults the port', async () => {
     const profiles = await parseProfiles(valid, {checkKeys: false});
-    expect(profiles[0]).toMatchObject({slug: 'baz', port: 22, keyPath: '/keys/baz'});
+    expect(profiles[0]).toMatchObject({
+      slug: 'baz', port: 22, keyPath: '/keys/baz',
+      sessions: [], sessionRouting: false,
+    });
+  });
+
+  test('loads fixed and one-click session configuration', async () => {
+    const profiles = await parseProfiles(`${valid}    sessions:
+      - name: mdp
+        label: MDP terminal
+        directory: /home/mdp
+    new_sessions:
+      enabled: true
+      directory: /home/mdp
+      prefix: ttyd-
+      max: 10
+`, {checkKeys: false});
+    expect(profiles[0]).toMatchObject({
+      sessionRouting: true,
+      sessions: [{slug: 'mdp', name: 'mdp', label: 'MDP terminal'}],
+      newSessions: {prefix: 'ttyd-', directory: '/home/mdp', max: 10},
+    });
+  });
+
+  test('allows explicitly disabling new sessions', async () => {
+    const profiles = await parseProfiles(`${valid}    sessions:
+      - name: mdp
+    new_sessions:
+      enabled: false
+`, {checkKeys: false});
+    expect(profiles[0]?.sessionRouting).toBe(true);
+    expect(profiles[0]?.newSessions).toBeUndefined();
+  });
+
+  test('does not combine legacy autorun with session routing', async () => {
+    expect(parseProfiles(`${valid}    autorun: tmux attach -t mdp
+    sessions:
+      - name: mdp
+    `, {checkKeys: false})).rejects.toThrow('cannot be combined');
+  });
+
+  test('keeps fixed sessions outside the managed namespace', async () => {
+    expect(parseProfiles(`${valid}    sessions:
+      - name: ttyd-mdp
+        slug: mdp
+    new_sessions: true
+`, {checkKeys: false})).rejects.toThrow('managed prefix');
   });
 
   test('loads an optional autorun command', async () => {

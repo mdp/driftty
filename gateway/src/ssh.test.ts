@@ -6,6 +6,7 @@ describe('SSH command', () => {
     const args = sshCommand({
       slug: 'baz', label: 'Baz', host: 'baz.example.net', port: 2222,
       user: 'mark', key: 'baz', keyPath: '/keys/baz',
+      sessions: [], sessionRouting: false,
     }, '/known-hosts/known_hosts');
     expect(args).toContain('BatchMode=yes');
     expect(args).toContain('IdentitiesOnly=yes');
@@ -22,6 +23,7 @@ describe('SSH command', () => {
       slug: 'baz', label: 'Baz', host: 'baz.example.net', port: 22,
       user: 'mark', key: 'baz', keyPath: '/keys/baz',
       autorun: "printf '%s\\n' \"$TTYD_SESSION\"; exec tmux new -A -s ttyd",
+      sessions: [], sessionRouting: false,
     }, '/known-hosts/known_hosts');
 
     expect(args.at(-1)).toBe(

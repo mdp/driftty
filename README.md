@@ -60,7 +60,15 @@ profiles:
     port: 22
     user: mark
     key: baz
-    autorun: tmux new-session -A -s ttyd
+    sessions:
+      - name: mdp
+        label: MDP terminal
+        directory: /home/mark
+    new_sessions:
+      enabled: true
+      directory: /home/mark
+      prefix: ttyd-
+      # max: 20
 ```
 
 `slug` must contain lowercase letters, numbers, and hyphens and is exposed at
@@ -71,11 +79,33 @@ stop the gateway. `autorun` is optional. When set, it runs in the remote
 login shell with `TTYD_SESSION=1`; when the command exits, the terminal
 connection closes. Omit it to open the normal interactive login shell.
 
-One profile redirects `/` to its terminal. Multiple profiles show a mobile
-picker containing labels only. `/slug` redirects to `/slug/`; unknown paths
-return 404.
+Profiles with `sessions` or `new_sessions` enabled use tmux session routing.
+Their host page lists configured pinned sessions and managed sessions at
+`/baz/`; terminals live at `/baz/session-name/`. A configured session is
+created on first click if it is not already running. `directory` sets its
+starting directory, and an optional `command` replaces the normal login shell.
 
-Each browser connection gets a separate SSH process. SSH uses public-key
+`new_sessions` adds a one-click `+` action. It creates a Docker-style name such
+as `clever-turing`, starts a detached tmux session, and redirects to it.
+Generated tmux sessions use the configured `prefix` (default `ttyd-`) so the
+gateway discovers only sessions it owns and does not expose unrelated tmux
+work. `max` optionally limits the number of managed sessions. Set
+`new_sessions: false`, set `enabled: false`, or omit it to prevent session
+creation.
+
+The remote tmux server is the session registry. On gateway restart, the router
+queries tmux and reconstructs its routes, so browser disconnects and gateway
+container restarts do not close sessions. If a session has ended, reloading its
+URL returns to the host page. Remote host restarts still require tmux
+persistence tooling if sessions must survive them.
+
+Profiles without `sessions` or `new_sessions` retain the original behavior:
+`autorun` optionally selects their command, and `/baz/` opens a terminal
+directly. One profile redirects `/` to its host or terminal; multiple profiles
+show a host picker containing labels only.
+
+Each browser connection gets a separate SSH process. Session-routed profiles
+attach that process to the selected persistent tmux session. SSH uses public-key
 authentication only, learns new host keys with `accept-new`, rejects changed
 keys, and exports `TTYD_SESSION=1` in the remote login shell. Caddy is an
 internal path/WebSocket router only; it provides no authentication. Configure
