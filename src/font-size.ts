@@ -1,3 +1,5 @@
+import type {ViewerProfile} from './viewer-profile';
+
 const MIN_FONT_SIZE = 10;
 const MAX_FONT_SIZE = 24;
 const DEFAULT_FONT_SIZE = 13;
@@ -20,7 +22,7 @@ export function fontSizeForViewport(
   return DEFAULT_FONT_SIZE;
 }
 
-export function initialFontSize(): number {
+export function initialFontSize(viewer?: ViewerProfile): number {
   try {
     const savedSize = Number.parseInt(
       localStorage.getItem('ttyd-font-size') ?? '',
@@ -31,8 +33,9 @@ export function initialFontSize(): number {
     // Storage can be disabled in privacy-focused browsers.
   }
 
-  const isTouchDevice =
-    'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const isTouchDevice = viewer
+    ? viewer.formFactor === 'mobile'
+    : 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   return fontSizeForViewport(
     window.innerWidth,
     window.innerHeight,

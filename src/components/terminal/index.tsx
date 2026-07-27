@@ -5,7 +5,6 @@ import { KeyboardOverlay } from '../keyboard-overlay';
 import { VoiceComposer } from '../voice-composer';
 import {TerminalLauncher} from '../terminal-launcher';
 import {measureVisualViewport} from '../../visual-viewport';
-import {isTouchCapable} from '../../touch-input';
 import type {ComposerSubmission} from '../voice-composer/actions';
 
 import '@xterm/xterm/css/xterm.css';
@@ -31,10 +30,11 @@ export class Terminal extends Component<Props, State> {
   private xterm: Xterm;
   private layoutHeight = window.innerHeight;
   private layoutWidth = window.innerWidth;
-  private readonly touchCapable = isTouchCapable(navigator);
+  private readonly mobileViewer: boolean;
 
   constructor(props: Props) {
     super();
+    this.mobileViewer = props.viewer.formFactor === 'mobile';
     this.xterm = new Xterm(props);
     this.state = {
       showKeyboard: false,
@@ -106,6 +106,8 @@ export class Terminal extends Component<Props, State> {
     return (
       <div
         class="terminal-shell"
+        data-viewer={this.props.viewer.formFactor}
+        data-os={this.props.viewer.os}
         style={{
           height: `${viewportHeight}px`,
           transform: `translateY(${viewportOffsetTop}px)`,
@@ -168,7 +170,7 @@ export class Terminal extends Component<Props, State> {
             onClose={this.closeComposer}
           />
         )}
-        {this.touchCapable &&
+        {this.mobileViewer &&
           !showComposer &&
           !showKeyboard &&
           !softwareKeyboardOpen && (
@@ -177,7 +179,7 @@ export class Terminal extends Component<Props, State> {
               onOpenComposer={this.openComposer}
             />
           )}
-        {!this.touchCapable && !showKeyboard && (
+        {!this.mobileViewer && !showKeyboard && (
           <button
             class="keyboard-toggle"
             onMouseDown={(event) => event.preventDefault()}

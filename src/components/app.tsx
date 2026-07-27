@@ -6,6 +6,7 @@ import type { ITerminalOptions, ITheme } from '@xterm/xterm';
 import type { ClientOptions, FlowControl } from './terminal/xterm';
 import {initialFontSize} from '../font-size';
 import {initialAutoReconnect} from '../reconnect';
+import {detectViewerProfile} from '../viewer-profile';
 
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const path = window.location.pathname.replace(/[/]+$/, '');
@@ -35,8 +36,9 @@ const clientOptions = {
   isWindows: false,
   unicodeVersion: '11',
 } as ClientOptions;
+const viewer = detectViewerProfile();
 const termOptions = {
-  fontSize: initialFontSize(),
+  fontSize: initialFontSize(viewer),
   fontFamily: 'Consolas,Liberation Mono,Menlo,Courier,monospace',
   theme: {
     foreground: '#d8f3e8',
@@ -79,6 +81,7 @@ export class App extends Component {
         clientOptions={clientOptions}
         termOptions={termOptions}
         flowControl={flowControl}
+        viewer={viewer}
       />
     );
   }

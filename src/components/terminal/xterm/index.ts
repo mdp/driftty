@@ -19,9 +19,10 @@ import {
   storeAutoReconnect,
 } from '../../../reconnect';
 import {
-  isTouchCapable,
   setNativeInputDisabled,
 } from '../../../touch-input';
+import type {ViewerProfile} from '../../../viewer-profile';
+import {selectionRange, terminalCellAt} from '../../../desktop-selection';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -75,6 +76,7 @@ export interface XtermOptions {
   flowControl: FlowControl;
   clientOptions: ClientOptions;
   termOptions: ITerminalOptions;
+  viewer: ViewerProfile;
 }
 
 export interface TouchSelectionBox {
@@ -132,9 +134,7 @@ export class Xterm {
   private touchSelectionListener?: (box?: TouchSelectionBox) => void;
   private selectionGestureDisposables: IDisposable[] = [];
   private touchSelectionText = '';
-  private readonly touchCapable = isTouchCapable(
-    typeof navigator === 'undefined' ? undefined : navigator,
-  );
+  private readonly mobileViewer = this.options.viewer.formFactor === 'mobile';
   private webKeyboardActive = false;
 
   private writeFunc = (data: ArrayBuffer) =>
@@ -159,7 +159,7 @@ export class Xterm {
   }
 
   public focus() {
-    if (this.touchCapable) return;
+    if (this.mobileViewer) return;
     this.terminal?.focus();
   }
 
@@ -175,12 +175,12 @@ export class Xterm {
     if (!textarea) return;
     setNativeInputDisabled(
       textarea,
-      this.touchCapable || this.webKeyboardActive,
+      this.mobileViewer || this.webKeyboardActive,
     );
   }
 
   public isNativeInputDisabled() {
-    return this.touchCapable || this.webKeyboardActive;
+    return this.mobileViewer || this.webKeyboardActive;
   }
 
   public armInputModifier(modifier: InputModifier) {
@@ -315,12 +315,13 @@ export class Xterm {
 
     terminal.open(parent);
     this.applyNativeInputState();
+    this.initDesktopSelection();
     this.initTouchSelection();
     fitAddon.fit();
   }
 
   private initTouchSelection() {
-    if (!this.touchCapable || !this.terminal.element) return;
+    if (!this.mobileViewer || !this.terminal.element) return;
     const element = this.terminal.element;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let startX = 0;
@@ -430,6 +431,78 @@ export class Xterm {
       addEventListener(element, 'pointerup', pointerUp),
       addEventListener(element, 'pointercancel', pointerCancel),
     );
+  }
+
+  /**
+   * Mouse-aware terminal programs own ordinary clicks. Shift+primary drag is
+   * reserved for local selection and is intercepted before xterm can report it
+   * to tmux. Doing this here also gives macOS the same Shift behavior as every
+   * other desktop (xterm otherwise uses Option there).
+   */
+  private initDesktopSelection() {
+    if (this.mobileViewer || !this.terminal.element) return;
+    const element = this.terminal.element;
+    let start: ReturnType<typeof terminalCellAt> | undefined;
+
+    const cellAt = (event: MouseEvent) => {
+      const screen = element.querySelector('.xterm-screen') as HTMLElement | null;
+      if (!screen) return;
+      return terminalCellAt(
+        event.clientX,
+        event.clientY,
+        screen.getBoundingClientRect(),
+        this.terminal.cols,
+        this.terminal.rows,
+      );
+    };
+    const update = (event: MouseEvent) => {
+      if (!start) return;
+      const end = cellAt(event);
+      if (!end) return;
+      const range = selectionRange(start, end, this.terminal.cols);
+      this.terminal.select(
+        range.column,
+        this.terminal.buffer.active.viewportY + range.row,
+        range.length,
+      );
+    };
+    const mouseMove = (rawEvent: Event) => {
+      const event = rawEvent as MouseEvent;
+      if (!start) return;
+      event.preventDefault();
+      event.stopPropagation();
+      update(event);
+    };
+    const mouseUp = (rawEvent: Event) => {
+      const event = rawEvent as MouseEvent;
+      if (!start || event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      update(event);
+      start = undefined;
+      document.removeEventListener('mousemove', mouseMove, true);
+      document.removeEventListener('mouseup', mouseUp, true);
+    };
+    const mouseDown = (rawEvent: Event) => {
+      const event = rawEvent as MouseEvent;
+      if (event.button !== 0 || !event.shiftKey) return;
+      const cell = cellAt(event);
+      if (!cell) return;
+      event.preventDefault();
+      event.stopPropagation();
+      start = cell;
+      this.terminal.clearSelection();
+      update(event);
+      document.addEventListener('mousemove', mouseMove, true);
+      document.addEventListener('mouseup', mouseUp, true);
+    };
+
+    element.addEventListener('mousedown', mouseDown, true);
+    this.selectionGestureDisposables.push(toDisposable(() => {
+      element.removeEventListener('mousedown', mouseDown, true);
+      document.removeEventListener('mousemove', mouseMove, true);
+      document.removeEventListener('mouseup', mouseUp, true);
+    }));
   }
 
   private textInsideBox(
