@@ -81,6 +81,82 @@ keys, and exports `TTYD_SESSION=1` in the remote login shell. Caddy is an
 internal path/WebSocket router only; it provides no authentication. Configure
 access policy in Cloudflare. Restart the gateway after editing profiles.
 
+## Local Compose development
+
+The development Compose file runs Vite with hot module replacement behind a
+required secret URL path. Behind it, the locally built generic ttyd image runs
+an isolated Alpine `sh` prompt. There are no SSH keys, remote hosts, gateway
+profiles, or Cloudflare credentials in the development stack.
+
+```bash
+TTYD_MOBILE_DEV_TOKEN=abc123secret \
+  TTYD_MOBILE_DEV_TAILSCALE_IP="$(tailscale ip -4)" \
+  TTYD_MOBILE_DEV_HOSTNAME=aachen.weasel-dojo.ts.net \
+  docker compose -f compose.dev.yaml up --build -d
+```
+
+The source tree is bind-mounted, so edits under `src/` reload in the browser
+immediately. Re-run with `--build` after changing dependencies or the
+Dockerfile. Follow the development output with:
+
+```bash
+docker compose -f compose.dev.yaml logs -f web terminal
+```
+
+The web service listens only on `127.0.0.1` and the configured Tailscale IPv4,
+not on the LAN or other host interfaces. Open its Tailscale IP or MagicDNS
+name with port 7681 and the secret path, for example
+`http://aachen.weasel-dojo.ts.net:7681/abc123secret/`. Requests without the
+configured access cookie return 404. Visiting the secret path sets an
+HttpOnly, same-site cookie and redirects to `/`, allowing Vite modules, HMR,
+and terminal WebSockets without exposing the token on every request. The token
+may contain letters, numbers, underscores, and hyphens. Use a long random value
+and do not commit it.
+
+Use another host port when 7681 is occupied:
+
+```bash
+TTYD_MOBILE_DEV_TOKEN=abc123secret \
+  TTYD_MOBILE_DEV_TAILSCALE_IP="$(tailscale ip -4)" \
+  TTYD_MOBILE_DEV_HOSTNAME=aachen.weasel-dojo.ts.net \
+  TTYD_MOBILE_DEV_PORT=8080 \
+  docker compose -f compose.dev.yaml up --build -d
+```
+
+Anyone who can reach that port can use the demo shell. The terminal container
+has no host mounts, uses a read-only filesystem with an ephemeral `/tmp`, and
+runs without Linux capabilities or privilege escalation. Still, expose it only
+on a trusted LAN or tailnet, not directly to the public internet.
+
+Stop and remove the development containers with
+`docker compose -f compose.dev.yaml down`.
+
+## Locally built gateway stack
+
+`compose.local.yaml` has the same SSH gateway, key mounts, known-hosts volume,
+and Cloudflare tunnel as `compose.yaml`, but builds the gateway image from the
+current checkout and tags it `ttyd-mobile-gateway:local`.
+
+```bash
+docker compose -f compose.local.yaml up --build -d
+```
+
+This uses the same `config/profiles.yaml`, `keys/`, and
+`CLOUDFLARE_TUNNEL_TOKEN` as the regular stack. Because both files intentionally
+use the `ttyd-mobile` Compose project name, switch between the registry and
+local-build versions by running `up -d` with the desired file:
+
+```bash
+# Return to the registry image
+docker compose -f compose.yaml up -d
+```
+
+Generate a key with the locally built tool using:
+
+```bash
+docker compose -f compose.local.yaml run --build --rm keygen baz
+```
+
 ## Build and test
 
 Requirements: Node 24+, Bun, and Docker.

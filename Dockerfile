@@ -7,6 +7,12 @@ COPY src/ ./src/
 COPY index.html tsconfig.json vite.config.ts ./
 RUN npm run build
 
+FROM node:24-alpine AS web-development
+
+WORKDIR /src
+COPY package*.json ./
+RUN npm ci
+
 FROM tsl0922/ttyd:alpine AS generic
 
 LABEL org.opencontainers.image.source="https://github.com/mdp/ttyd-mobile" \
