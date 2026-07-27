@@ -313,6 +313,23 @@ export class Xterm {
     terminal.loadAddon(multilineWebLinksAddon);
     terminal.loadAddon(webLinksAddon);
 
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (
+        event.key !== 'Enter' ||
+        !event.shiftKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.metaKey
+      ) {
+        return true;
+      }
+
+      // xterm otherwise collapses Shift+Enter to CR. Coding-agent prompts
+      // commonly recognize LF (the same byte as Ctrl-J) as a multiline input.
+      if (event.type === 'keydown') this.sendData('\n');
+      return false;
+    });
+
     terminal.open(parent);
     this.applyNativeInputState();
     this.initDesktopSelection();
