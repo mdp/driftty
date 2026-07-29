@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {
+  anchorViewportTransformToBottom,
   clampViewportTransform,
   customTerminalViewportSize,
   fixedTerminalSize,
@@ -31,6 +32,14 @@ describe('terminal viewport sizing', () => {
       {width: 500, height: 400},
       {x: -500, y: 40, scale: 1},
     )).toEqual({x: -200, y: 0, scale: 1});
+  });
+
+  it('anchors the surface bottom when a keyboard shrinks the viewport', () => {
+    expect(anchorViewportTransformToBottom(
+      {width: 300, height: 200},
+      {width: 500, height: 400},
+      {x: -80, y: -40, scale: 1},
+    )).toEqual({x: -80, y: -200, scale: 1});
   });
 
   it('calculates the fixed surface without adding wrapper padding', () => {

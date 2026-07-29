@@ -22,6 +22,7 @@ import {
   saveComposerDraft,
 } from '../voice-composer/draft';
 import {
+  anchorViewportTransformToBottom,
   clampViewportTransform,
   fixedTerminalSize,
   loadTerminalViewportSize,
@@ -372,6 +373,7 @@ export class Terminal extends Component<Props, State> {
       requestAnimationFrame(() => {
         this.xterm.fit();
         this.xterm.scrollToBottom();
+        this.anchorFixedTerminalBottom();
       })
     );
   };
@@ -503,9 +505,41 @@ export class Terminal extends Component<Props, State> {
       requestAnimationFrame(() => {
         this.xterm.fit();
         this.xterm.scrollToBottom();
+        this.anchorFixedTerminalBottom();
       })
     );
   };
+
+  private anchorFixedTerminalBottom() {
+    const {
+      terminalViewportSize,
+      terminalSurfaceWidth,
+      terminalSurfaceHeight,
+      terminalScale,
+      terminalTranslateX,
+      terminalTranslateY,
+    } = this.state;
+    const bounds = this.viewport?.getBoundingClientRect();
+    if (
+      terminalViewportSize === 'auto' ||
+      !terminalSurfaceWidth ||
+      !terminalSurfaceHeight ||
+      !bounds
+    ) return;
+    const transform = anchorViewportTransformToBottom(
+      bounds,
+      {width: terminalSurfaceWidth, height: terminalSurfaceHeight},
+      {
+        x: terminalTranslateX,
+        y: terminalTranslateY,
+        scale: terminalScale,
+      },
+    );
+    this.setState({
+      terminalTranslateX: transform.x,
+      terminalTranslateY: transform.y,
+    });
+  }
 
   @bind
   toggleAutoReconnect() {
@@ -711,6 +745,8 @@ export class Terminal extends Component<Props, State> {
     );
     const keyboardJustOpened =
       measurement.keyboardOpen && !this.state.softwareKeyboardOpen;
+    const keyboardChanged =
+      measurement.keyboardOpen !== this.state.softwareKeyboardOpen;
 
     this.setState(
       {
@@ -722,7 +758,10 @@ export class Terminal extends Component<Props, State> {
       () => {
         requestAnimationFrame(() => {
           this.xterm.fit();
-          if (keyboardJustOpened) this.xterm.scrollToBottom();
+          if (keyboardChanged) {
+            this.xterm.scrollToBottom();
+            this.anchorFixedTerminalBottom();
+          }
         });
       }
     );

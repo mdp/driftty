@@ -107,3 +107,14 @@ export function clampViewportTransform(
       : Math.min(0, Math.max(viewport.height - scaledHeight, transform.y)),
   };
 }
+
+export function anchorViewportTransformToBottom(
+  viewport: Pick<DOMRect, 'width' | 'height'>,
+  surface: {width: number; height: number},
+  transform: TerminalTransform,
+): TerminalTransform {
+  return clampViewportTransform(viewport, surface, {
+    ...transform,
+    y: viewport.height - surface.height * transform.scale,
+  });
+}
