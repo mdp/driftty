@@ -118,3 +118,26 @@ export function anchorViewportTransformToBottom(
     y: viewport.height - surface.height * transform.scale,
   });
 }
+
+export function fitViewportTransform(
+  viewport: Pick<DOMRect, 'width' | 'height'>,
+  surface: {width: number; height: number},
+): TerminalTransform {
+  const scale = Math.min(
+    2.5,
+    viewport.width / surface.width,
+    viewport.height / surface.height,
+  );
+  return {
+    x: (viewport.width - surface.width * scale) / 2,
+    y: (viewport.height - surface.height * scale) / 2,
+    scale,
+  };
+}
+
+export function shouldFitTerminalOnMouseDown(
+  viewportSize: TerminalViewportSize,
+  clickCount: number,
+): boolean {
+  return viewportSize !== 'auto' && clickCount === 2;
+}

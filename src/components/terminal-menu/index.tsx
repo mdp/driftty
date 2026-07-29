@@ -296,8 +296,8 @@ export class TerminalMenu extends Component<Props> {
               </div>
               <p>
                 {mobile
-                  ? 'Fixed sizes support two-finger pan and pinch zoom.'
-                  : 'Fixed sizes preserve the selected TTY geometry and scale to fit.'}
+                  ? 'Fixed sizes support two-finger pan, pinch zoom, and double-tap to fit.'
+                  : 'Fixed sizes preserve the selected TTY geometry; double-click to fit.'}
               </p>
             </fieldset>
           )}

@@ -3,8 +3,10 @@ import {
   anchorViewportTransformToBottom,
   clampViewportTransform,
   customTerminalViewportSize,
+  fitViewportTransform,
   fixedTerminalSize,
   loadTerminalViewportSize,
+  shouldFitTerminalOnMouseDown,
   terminalSurfacePixels,
 } from './viewport-size';
 
@@ -40,6 +42,23 @@ describe('terminal viewport sizing', () => {
       {width: 500, height: 400},
       {x: -80, y: -40, scale: 1},
     )).toEqual({x: -80, y: -200, scale: 1});
+  });
+
+  it('fits and centers the complete surface at the largest useful scale', () => {
+    expect(fitViewportTransform(
+      {width: 300, height: 200},
+      {width: 500, height: 400},
+    )).toEqual({x: 25, y: 0, scale: 0.5});
+    expect(fitViewportTransform(
+      {width: 300, height: 200},
+      {width: 100, height: 100},
+    )).toEqual({x: 50, y: 0, scale: 2});
+  });
+
+  it('reserves the second mouse-down for fitting only in fixed-size mode', () => {
+    expect(shouldFitTerminalOnMouseDown('80x24', 2)).toBe(true);
+    expect(shouldFitTerminalOnMouseDown('auto', 2)).toBe(false);
+    expect(shouldFitTerminalOnMouseDown('80x24', 1)).toBe(false);
   });
 
   it('calculates the fixed surface without adding wrapper padding', () => {

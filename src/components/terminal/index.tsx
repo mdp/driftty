@@ -24,9 +24,11 @@ import {
 import {
   anchorViewportTransformToBottom,
   clampViewportTransform,
+  fitViewportTransform,
   fixedTerminalSize,
   loadTerminalViewportSize,
   saveTerminalViewportSize,
+  shouldFitTerminalOnMouseDown,
   terminalSurfacePixels,
   type TerminalViewportSize,
 } from './viewport-size';
@@ -70,7 +72,12 @@ export class Terminal extends Component<Props, State> {
   private layoutWidth = window.innerWidth;
   private readonly mobileViewer: boolean;
   private ctrlTimer?: number;
-  private viewportPointers = new Map<number, {x: number; y: number}>();
+  private viewportPointers = new Map<
+    number,
+    {x: number; y: number; startX: number; startY: number}
+  >();
+  private lastViewportTap?: {time: number; x: number; y: number};
+  private viewportGestureUsed = false;
   private viewportGesture?: {
     distance: number;
     contentX: number;
@@ -212,6 +219,7 @@ export class Terminal extends Component<Props, State> {
           onPointerMoveCapture={this.handleViewportPointerMove}
           onPointerUpCapture={this.handleViewportPointerEnd}
           onPointerCancelCapture={this.handleViewportPointerEnd}
+          onMouseDownCapture={this.handleViewportMouseDown}
         >
           <div
             class="terminal-surface"
@@ -614,8 +622,12 @@ export class Terminal extends Component<Props, State> {
     this.viewportPointers.set(event.pointerId, {
       x: event.clientX,
       y: event.clientY,
+      startX: event.clientX,
+      startY: event.clientY,
     });
     if (this.viewportPointers.size !== 2) return;
+    this.viewportGestureUsed = true;
+    this.lastViewportTap = undefined;
     event.preventDefault();
     event.stopPropagation();
     this.xterm.cancelTouchSelection();
@@ -653,7 +665,10 @@ export class Terminal extends Component<Props, State> {
 
   private handleViewportPointerMove = (event: PointerEvent) => {
     if (!this.viewportPointers.has(event.pointerId)) return;
+    const pointer = this.viewportPointers.get(event.pointerId);
+    if (!pointer) return;
     this.viewportPointers.set(event.pointerId, {
+      ...pointer,
       x: event.clientX,
       y: event.clientY,
     });
@@ -708,9 +723,77 @@ export class Terminal extends Component<Props, State> {
   };
 
   private handleViewportPointerEnd = (event: PointerEvent) => {
+    const pointer = this.viewportPointers.get(event.pointerId);
+    const wasGesture = this.viewportGestureUsed;
     this.viewportPointers.delete(event.pointerId);
     if (this.viewportPointers.size < 2) this.viewportGesture = undefined;
+    if (
+      pointer &&
+      !wasGesture &&
+      event.type === 'pointerup' &&
+      Math.hypot(
+        event.clientX - pointer.startX,
+        event.clientY - pointer.startY,
+      ) < 12
+    ) {
+      const previous = this.lastViewportTap;
+      if (
+        previous &&
+        event.timeStamp - previous.time < 350 &&
+        Math.hypot(event.clientX - previous.x, event.clientY - previous.y) < 32
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.lastViewportTap = undefined;
+        this.fitFixedTerminalToViewport();
+      } else {
+        this.lastViewportTap = {
+          time: event.timeStamp,
+          x: event.clientX,
+          y: event.clientY,
+        };
+      }
+    }
+    if (this.viewportPointers.size === 0) this.viewportGestureUsed = false;
   };
+
+  private handleViewportMouseDown = (event: MouseEvent) => {
+    if (
+      !shouldFitTerminalOnMouseDown(
+        this.state.terminalViewportSize,
+        event.detail,
+      )
+    ) return;
+    if (!this.fitFixedTerminalToViewport()) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  private fitFixedTerminalToViewport(): boolean {
+    const {
+      terminalViewportSize,
+      terminalSurfaceWidth,
+      terminalSurfaceHeight,
+    } = this.state;
+    const bounds = this.viewport?.getBoundingClientRect();
+    if (
+      terminalViewportSize === 'auto' ||
+      !terminalSurfaceWidth ||
+      !terminalSurfaceHeight ||
+      !bounds
+    ) return false;
+    this.xterm.cancelTouchSelection();
+    const transform = fitViewportTransform(
+      bounds,
+      {width: terminalSurfaceWidth, height: terminalSurfaceHeight},
+    );
+    this.setState({
+      terminalScale: transform.scale,
+      terminalTranslateX: transform.x,
+      terminalTranslateY: transform.y,
+    });
+    return true;
+  }
 
   private handleViewportChange = () => {
     const viewport = window.visualViewport;
