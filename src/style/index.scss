@@ -46,14 +46,33 @@ body {
   margin: 0 auto;
   padding: 0;
   .terminal {
-    padding: 5px;
-    height: calc(100% - 10px);
+    height: 100%;
+    padding: 0;
   }
 
   .xterm-viewport {
     scrollbar-color: rgba(89, 243, 255, 0.32) rgba(5, 8, 11, 0.6);
     scrollbar-width: thin;
   }
+}
+
+.terminal-viewport {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+
+  &--fixed {
+    touch-action: none;
+  }
+}
+
+.terminal-surface {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  transform-origin: 0 0;
+  will-change: transform;
 }
 
 .reconnect-button {

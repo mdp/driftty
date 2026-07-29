@@ -52,6 +52,11 @@ enum Command {
 type Preferences = ITerminalOptions & ClientOptions;
 
 export type RendererType = 'dom' | 'canvas' | 'webgl';
+export type ConnectionState =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'disconnected';
 
 export interface ClientOptions {
   rendererType: RendererType;
@@ -132,6 +137,8 @@ export class Xterm {
   private exited = false;
   private reconnectListener?: (needsManualReconnect: boolean) => void;
   private exitListener?: () => void;
+  private connectionState: ConnectionState = 'connecting';
+  private connectionStateListener?: (state: ConnectionState) => void;
   private inputModifier?: InputModifier;
   private modifierListener?: (modifier?: InputModifier) => void;
   private touchSelectionListener?: (box?: TouchSelectionBox) => void;
@@ -139,6 +146,8 @@ export class Xterm {
   private touchSelectionText = '';
   private readonly mobileViewer = this.options.viewer.formFactor === 'mobile';
   private webKeyboardActive = false;
+  private fixedSize?: {columns: number; rows: number};
+  private cancelTouchGesture?: () => void;
 
   private writeFunc = (data: ArrayBuffer) =>
     this.writeData(new Uint8Array(data));
@@ -153,8 +162,34 @@ export class Xterm {
   }
 
   public fit() {
-    if (!this.opened) return;
-    this.fitAddon.fit();
+    if (!this.terminal) return;
+    if (this.fixedSize) {
+      this.terminal.resize(this.fixedSize.columns, this.fixedSize.rows);
+    } else {
+      this.fitAddon.fit();
+    }
+  }
+
+  public setFixedSize(size?: {columns: number; rows: number}) {
+    this.fixedSize = size;
+    this.fit();
+  }
+
+  public cellSize() {
+    const screen = this.terminal?.element?.querySelector(
+      '.xterm-screen'
+    ) as HTMLElement | null;
+    if (!screen || !this.terminal.cols || !this.terminal.rows) return;
+    return {
+      // offsetWidth/offsetHeight deliberately exclude the mobile viewport's
+      // CSS transform, so changing between fixed sizes does not compound zoom.
+      width: screen.offsetWidth / this.terminal.cols,
+      height: screen.offsetHeight / this.terminal.rows,
+    };
+  }
+
+  public cancelTouchSelection() {
+    this.cancelTouchGesture?.();
   }
 
   public scrollToBottom() {
@@ -258,6 +293,18 @@ export class Xterm {
     this.exitListener = listener;
   }
 
+  public onConnectionStateChange(
+    listener?: (state: ConnectionState) => void
+  ) {
+    this.connectionStateListener = listener;
+    listener?.(this.connectionState);
+  }
+
+  private setConnectionState(state: ConnectionState) {
+    this.connectionState = state;
+    this.connectionStateListener?.(state);
+  }
+
   public reconnectNow() {
     if (this.exited) return;
     clearTimeout(this.reconnectTimer);
@@ -265,6 +312,7 @@ export class Xterm {
     this.manualReconnectKey = undefined;
     this.reconnectAttempts = 0;
     this.reconnectListener?.(false);
+    this.setConnectionState('connecting');
     this.overlayAddon.showOverlay('Reconnecting...');
     this.refreshToken().then(this.connect);
   }
@@ -312,7 +360,7 @@ export class Xterm {
     } = this;
     window.term = terminal as TtydTerminal;
     window.term.fit = () => {
-      this.fitAddon.fit();
+      this.fit();
     };
 
     terminal.loadAddon(fitAddon);
@@ -449,6 +497,7 @@ export class Xterm {
       this.touchSelectionText = '';
       this.touchSelectionListener?.();
     };
+    this.cancelTouchGesture = pointerCancel;
 
     this.selectionGestureDisposables.push(
       addEventListener(element, 'pointerdown', pointerDown),
@@ -614,7 +663,7 @@ export class Xterm {
         this.overlayAddon?.showOverlay('\u2702', 200);
       }),
     );
-    register(addEventListener(window, 'resize', () => fitAddon.fit()));
+    register(addEventListener(window, 'resize', () => this.fit()));
     register(addEventListener(window, 'beforeunload', this.onWindowUnload));
   }
 
@@ -667,6 +716,9 @@ export class Xterm {
   @bind
   public connect() {
     if (this.disposed) return;
+    this.setConnectionState(
+      this.reconnectAttempts > 0 ? 'reconnecting' : 'connecting'
+    );
     this.socket = new WebSocket(this.options.wsUrl, ['tty']);
     const { socket, register } = this;
 
@@ -706,6 +758,7 @@ export class Xterm {
     this.manualReconnectKey?.dispose();
     this.manualReconnectKey = undefined;
     this.reconnectListener?.(false);
+    this.setConnectionState('connected');
     this.initListeners();
     this.focus();
   }
@@ -724,6 +777,7 @@ export class Xterm {
       this.doReconnect = false;
       this.terminal.options.disableStdin = true;
       this.reconnectListener?.(false);
+      this.setConnectionState('disconnected');
       this.exitListener?.();
       overlayAddon.showOverlay('Exited');
       return;
@@ -735,6 +789,7 @@ export class Xterm {
       this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS
     ) {
       this.reconnectAttempts++;
+      this.setConnectionState('reconnecting');
       const delay = reconnectDelay(this.reconnectAttempts);
       overlayAddon.showOverlay(
         `Reconnecting ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`,
@@ -744,8 +799,10 @@ export class Xterm {
         delay,
       );
     } else if (this.closeOnDisconnect) {
+      this.setConnectionState('disconnected');
       window.close();
     } else {
+      this.setConnectionState('disconnected');
       const { terminal } = this;
       this.manualReconnectKey?.dispose();
       this.manualReconnectKey = terminal.onKey((e) => {
@@ -907,7 +964,7 @@ export class Xterm {
           } else {
             terminal.options[key] = value;
           }
-          if (key.indexOf('font') === 0) fitAddon.fit();
+          if (key.indexOf('font') === 0) this.fit();
           break;
       }
     }

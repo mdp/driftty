@@ -72,17 +72,6 @@ $cut: 8px;
     white-space: nowrap;
   }
 
-  &__signal {
-    width: 5px;
-    height: 5px;
-    background: $green;
-    border-radius: 50%;
-    box-shadow:
-      0 0 5px $green,
-      0 0 10px rgba($green, 0.6);
-    animation: signal-pulse 1.8s ease-in-out infinite;
-  }
-
   &__status-section {
     min-width: 0;
     margin-right: auto;
@@ -101,92 +90,6 @@ $cut: 8px;
     &::-webkit-scrollbar {
       display: none;
     }
-  }
-
-  &__settings-trigger {
-    flex: 0 0 auto;
-    padding: 2px 0 2px 6px;
-    color: $muted;
-    background: transparent;
-    border: 0;
-    font: 700 9px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    cursor: pointer;
-    touch-action: manipulation;
-
-    &--active,
-    &:active {
-      color: $cyan;
-    }
-
-    &:focus-visible {
-      outline: 1px solid $cyan;
-      outline-offset: 2px;
-    }
-  }
-
-  &__settings-page {
-    display: grid;
-    gap: 6px;
-    padding: 2px 0;
-  }
-
-  &__settings-row {
-    display: flex;
-    min-height: 54px;
-    box-sizing: border-box;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 10px 14px;
-    color: #d9eeee;
-    background: linear-gradient(180deg, rgba(24, 43, 49, 0.94), rgba(8, 15, 19, 0.96));
-    border: 1px solid rgba($cyan, 0.2);
-    border-radius: 6px;
-    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
-    text-decoration: none;
-    cursor: pointer;
-    touch-action: manipulation;
-
-    strong,
-    small {
-      display: block;
-    }
-
-    strong {
-      color: $cyan;
-      font-size: 12px;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-
-    small {
-      margin-top: 4px;
-      color: $muted;
-      font-size: 10px;
-    }
-
-    input {
-      width: 20px;
-      height: 20px;
-      flex: 0 0 auto;
-      accent-color: $cyan;
-    }
-
-    &:active {
-      background: rgba($cyan, 0.13);
-    }
-
-    &:focus-visible {
-      outline: 2px solid $cyan;
-      outline-offset: 1px;
-    }
-  }
-
-  &__settings-arrow {
-    color: $magenta;
-    font-size: 22px;
   }
 
   &__tab,
@@ -256,24 +159,8 @@ $cut: 8px;
       }
     }
 
-    &--composer {
-      color: $magenta;
-      filter: drop-shadow(0 0 4px rgba($magenta, 0.55));
-    }
-  }
-
-  &__microphone {
-    width: 19px;
-    height: 19px;
-    overflow: visible;
-    vertical-align: middle;
-    fill: currentColor;
-
-    path {
-      fill: none;
-      stroke: currentColor;
-      stroke-width: 1.8;
-      stroke-linecap: round;
+    &--close {
+      color: $danger;
     }
   }
 
@@ -608,16 +495,6 @@ $cut: 8px;
   }
 }
 
-@keyframes signal-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
 @media (max-width: 430px) {
   .keyboard-overlay {
     &__buttons {
@@ -654,6 +531,31 @@ $cut: 8px;
 
     &__special-keys .keyboard-overlay__button {
       height: 30px;
+    }
+  }
+}
+
+@media (min-width: 720px) {
+  .keyboard-overlay {
+    left: 50%;
+    right: auto;
+    width: min(720px, 100%);
+    box-sizing: border-box;
+    border-right: 1px solid rgba($cyan, 0.25);
+    border-left: 1px solid rgba($cyan, 0.25);
+    transform: translateX(-50%);
+  }
+
+  @keyframes terminal-deploy {
+    from {
+      opacity: 0;
+      clip-path: inset(100% 0 0 0);
+      transform: translate(-50%, 12px);
+    }
+    to {
+      opacity: 1;
+      clip-path: inset(0 0 0 0);
+      transform: translate(-50%, 0);
     }
   }
 }

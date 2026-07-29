@@ -19,7 +19,6 @@ interface Props {
   terminal: Xterm;
   show: boolean;
   onToggle: () => void;
-  onOpenComposer: () => void;
   onHeightChange: (height: number) => void;
 }
 
@@ -29,9 +28,7 @@ type KeyboardLayer = 'letters' | 'symbols';
 interface State {
   modifier?: InputModifier;
   section: Section;
-  autoReconnect: boolean;
   layer: KeyboardLayer;
-  showSettings: boolean;
 }
 
 export class KeyboardOverlay extends Component<Props, State> {
@@ -43,9 +40,7 @@ export class KeyboardOverlay extends Component<Props, State> {
     super(props);
     this.state = {
       section: 'agent',
-      autoReconnect: props.terminal.isAutoReconnectEnabled(),
       layer: 'letters',
-      showSettings: false,
     };
   }
 
@@ -115,47 +110,6 @@ export class KeyboardOverlay extends Component<Props, State> {
     this.sendKey(sequences.tmuxScrollExit);
     this.setState({section: 'tmux'});
   };
-
-  private toggleAutoReconnect = () => {
-    const autoReconnect = !this.state.autoReconnect;
-    this.props.terminal.setAutoReconnect(autoReconnect);
-    this.setState({autoReconnect});
-  };
-
-  private openSettings = () => {
-    this.setState({showSettings: true});
-  };
-
-  private closeSettings = () => {
-    this.setState({showSettings: false});
-  };
-
-  private renderSettings() {
-    return (
-      <div class="keyboard-overlay__settings-page" aria-label="Settings">
-        <a class="keyboard-overlay__settings-row" href="/">
-          <span>
-            <strong>Hosts</strong>
-            <small>Return to the main host list</small>
-          </span>
-          <span class="keyboard-overlay__settings-arrow" aria-hidden="true">
-            →
-          </span>
-        </a>
-        <label class="keyboard-overlay__settings-row">
-          <span>
-            <strong>Auto reconnect</strong>
-            <small>Reconnect automatically if the session drops</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={this.state.autoReconnect}
-            onChange={this.toggleAutoReconnect}
-          />
-        </label>
-      </div>
-    );
-  }
 
   private renderKey = (key: ToolbarKey) => (
     <button
@@ -370,7 +324,6 @@ export class KeyboardOverlay extends Component<Props, State> {
   render() {
     if (!this.props.show) return null;
 
-    const {showSettings} = this.state;
     const sections: Array<{id: Exclude<Section, 'tmux-scroll'>; label: string}> =
       [
         {id: 'agent', label: 'Agent'},
@@ -386,81 +339,40 @@ export class KeyboardOverlay extends Component<Props, State> {
         onPointerDown={(event) => event.preventDefault()}
       >
         <div class="keyboard-overlay__status">
-          <span class="keyboard-overlay__signal" aria-hidden="true" />
-          <span>TTYD//REMOTE</span>
+          <span>Full keyboard</span>
           <span class="keyboard-overlay__status-section">
-            {showSettings ? 'settings' : this.state.section.replace('-', '_')}
+            {this.state.section.replace('-', ' ')}
           </span>
-          <button
-            class={`keyboard-overlay__settings-trigger ${
-              showSettings ? 'keyboard-overlay__settings-trigger--active' : ''
-            }`}
-            onClick={showSettings ? this.closeSettings : this.openSettings}
-            aria-expanded={showSettings}
-            aria-label={showSettings ? 'Close settings' : 'Open settings'}
-          >
-            <span aria-hidden="true">⚙</span> Settings
-          </button>
         </div>
         <div class="keyboard-overlay__rail">
-          {showSettings ? (
+          {sections.map(({id, label}) => (
             <button
-              class="keyboard-overlay__tab keyboard-overlay__tab--active"
-              onClick={this.closeSettings}
+              key={id}
+              class={`keyboard-overlay__tab ${
+                this.state.section === id
+                  ? 'keyboard-overlay__tab--active'
+                  : ''
+              }`}
+              onClick={() => this.setState({section: id})}
             >
-              ← Back
+              {label}
             </button>
-          ) : (
-            <>
-              {sections.map(({id, label}) => (
-                <button
-                  key={id}
-                  class={`keyboard-overlay__tab ${
-                    this.state.section === id
-                      ? 'keyboard-overlay__tab--active'
-                      : ''
-                  }`}
-                  onClick={() => this.setState({section: id})}
-                >
-                  {label}
-                </button>
-              ))}
-              <button
-                class="keyboard-overlay__tab keyboard-overlay__tab--composer"
-                onClick={this.props.onOpenComposer}
-                title="Open Input and Paste"
-                aria-label="Open Input and Paste"
-              >
-                <svg
-                  class="keyboard-overlay__microphone"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <rect x="9" y="3" width="6" height="11" rx="3" />
-                  <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M9 21h6" />
-                </svg>
-              </button>
-            </>
-          )}
+          ))}
           <button
-            class="keyboard-overlay__tab"
+            class="keyboard-overlay__tab keyboard-overlay__tab--close"
             onClick={this.props.onToggle}
             title="Close keyboard"
             aria-label="Close keyboard"
           >
-            ⌄
+            Close
           </button>
         </div>
-        {showSettings ? (
-          this.renderSettings()
-        ) : (
-          <div class="keyboard-overlay__keyboard">
-            <div class="keyboard-overlay__special-keys">
-              {this.renderSection()}
-            </div>
-            {this.renderKeyboard()}
+        <div class="keyboard-overlay__keyboard">
+          <div class="keyboard-overlay__special-keys">
+            {this.renderSection()}
           </div>
-        )}
+          {this.renderKeyboard()}
+        </div>
       </div>
     );
   }

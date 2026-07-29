@@ -1,0 +1,182 @@
+$void: #05080b;
+$cyan: #59f3ff;
+$magenta: #ff56d8;
+
+.terminal-quickbar {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1100;
+  box-sizing: border-box;
+  padding: 4px max(3px, env(safe-area-inset-right))
+    max(4px, env(safe-area-inset-bottom))
+    max(3px, env(safe-area-inset-left));
+  color: #d9eeee;
+  background: linear-gradient(180deg, rgba(12, 27, 34, 0.98), rgba($void, 0.99));
+  border-top: 1px solid rgba($cyan, 0.45);
+  box-shadow: 0 -5px 18px rgba(0, 0, 0, 0.55);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  user-select: none;
+  -webkit-user-select: none;
+
+  &__actions,
+  &__context,
+  &__modes {
+    display: flex;
+    gap: 1px;
+  }
+
+  &__actions {
+    width: 100%;
+    min-height: 44px;
+    margin-top: 3px;
+  }
+
+  &__modes {
+    height: 31px;
+    padding: 1px;
+    gap: 0;
+    background: rgba(5, 14, 18, 0.78);
+    border: 1px solid rgba($cyan, 0.22);
+    border-radius: 4px;
+  }
+
+  &__context {
+    min-width: 0;
+    flex: 1 1 auto;
+
+    .terminal-quickbar__key {
+      width: 25%;
+      min-width: 44px;
+      flex: 1 1 25%;
+    }
+  }
+
+  &__key {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 4px;
+    flex: 0 0 44px;
+    color: #d9eeee;
+    background: rgba(18, 38, 44, 0.92);
+    border: 1px solid rgba($cyan, 0.2);
+    border-radius: 3px;
+    font: 700 9px/1 ui-monospace, monospace;
+    letter-spacing: -0.04em;
+    touch-action: manipulation;
+
+    &:active {
+      color: $cyan;
+      background: rgba($cyan, 0.14);
+      border-color: $cyan;
+    }
+
+    &:focus-visible {
+      outline: 2px solid $cyan;
+      outline-offset: -3px;
+    }
+
+    &[aria-pressed='true'] {
+      color: $void;
+      background: $cyan;
+      border-color: $cyan;
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 1;
+    }
+
+    &--danger {
+      color: #ff879d;
+    }
+
+    &--compose {
+      position: relative;
+      color: $magenta;
+      border-color: rgba($magenta, 0.42);
+    }
+
+    &--icon {
+      color: $cyan;
+
+      svg {
+        width: 21px;
+        height: 21px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.6;
+      }
+    }
+  }
+
+  &__mode {
+    position: relative;
+    min-width: 0;
+    height: 29px;
+    padding: 0 4px;
+    flex: 1 1 25%;
+    color: rgba(#d9eeee, 0.72);
+    background: transparent;
+    border: 0;
+    border-radius: 3px;
+    font: 700 11px/1 ui-monospace, monospace;
+    text-transform: none;
+    touch-action: manipulation;
+
+    &[aria-pressed='true'] {
+      color: $cyan;
+      background: rgba($cyan, 0.13);
+      box-shadow: inset 0 -2px 0 $cyan;
+
+      &::after {
+        position: absolute;
+        right: 30%;
+        bottom: -4px;
+        left: 30%;
+        height: 3px;
+        content: '';
+        background: $cyan;
+        clip-path: polygon(0 0, 100% 0, 50% 100%);
+      }
+    }
+
+    &:focus-visible {
+      outline: 2px solid $cyan;
+      outline-offset: -2px;
+    }
+
+    &:disabled {
+      opacity: 1;
+    }
+  }
+
+  &__draft {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 5px;
+    height: 5px;
+    background: $magenta;
+    border-radius: 50%;
+    box-shadow: 0 0 5px rgba($magenta, 0.8);
+  }
+
+  &__armed {
+    position: absolute;
+    top: 9px;
+    right: 7px;
+    z-index: 1;
+    padding: 1px 4px;
+    color: #ffd166;
+    background: $void;
+    font: 700 8px/12px ui-monospace, monospace;
+    text-align: center;
+    text-transform: uppercase;
+    border: 1px solid rgba(#ffd166, 0.55);
+  }
+}

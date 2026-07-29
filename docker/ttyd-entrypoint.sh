@@ -7,5 +7,6 @@ exec ttyd \
   --interface 0.0.0.0 \
   --port 7681 \
   --writable \
+  --srv-buf-size 65536 \
   --index /usr/share/ttyd/index.html \
   "$@"
