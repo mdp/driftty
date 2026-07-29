@@ -10,6 +10,7 @@ export const quickbarControls: Record<QuickbarMode, QuickbarControl[]> = {
     {label: '↑', action: 'up'},
     {label: '↓', action: 'down'},
     {label: 'Tab', action: 'tab'},
+    {label: '/', action: 'slash'},
     {label: 'Enter', action: 'enter'},
   ],
   nav: [

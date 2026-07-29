@@ -180,28 +180,24 @@ is hidden behind the Terminal menu and legacy keyboard.
 
 ### 7.1 Default layout
 
-The first implementation ships one layout optimized for agent supervision:
+The compact control surface has a horizontally scrollable section rail:
 
 ```text
-[Esc] [↑] [↓] [Tab] [Enter] [/] [Scroll] [Compose] [More]
+[Agent] [Nav] [tmux] [Ctrl] → [More]
 ```
 
-Priority is:
+`More` is the final rail item and opens the Terminal menu. The selected
+section supplies the horizontally scrollable shortcut strip below it. The
+default Agent strip is:
 
-1. `Esc`
-2. `↑`
-3. `↓`
-4. `Tab`
-5. `Enter`
-6. `/`
-7. `Scroll`
-8. `Compose`
-9. `More`
+```text
+[Esc] [↑] [↓] [Tab] [/] [Enter] →  [Keyboard] [Compose]
+```
 
-All nine actions should fit at the narrowest supported width by using compact
-visual keys inside 44 px touch targets. If they cannot fit, the middle actions
-may scroll horizontally, but `Esc`, `Scroll`, `Compose`, and `More` must remain
-pinned and visible. The bar must not silently hide an urgent control.
+The section rail and shortcut strip scroll independently. Keyboard and Compose
+remain fixed at the right edge while shortcuts pass beneath their masked
+surface. This gives later sections and shortcuts room without shrinking their
+labels. A hidden scrollbar must not prevent touch panning.
 
 Why Enter is present: questionnaires commonly require a selection to be
 confirmed, and opening a keyboard merely to confirm it defeats the Quickbar.
@@ -222,10 +218,8 @@ Every target is at least 44 × 44 CSS pixels. Visible keycaps may be smaller.
 
 ### 7.3 Collapsing
 
-Phase 1 does not include a manually collapsed Quickbar. A permanently available
-Escape is more valuable than the small number of terminal rows recovered by a
-handle. The implementation may revisit collapse only after measuring the
-default bar on small screens.
+Phase 1 does not include a manually collapsed Quickbar. The implementation may
+revisit collapse only after measuring the default bar on small screens.
 
 ### 7.4 Agent and Shell presets
 
@@ -721,10 +715,11 @@ This is the lowest-risk slice and fixes desktop without changing terminal input.
 
 ### Mobile
 
-- The closed state exposes Escape, Up, Down, Tab, Enter, slash, Scroll,
-  Compose, and More.
+- The closed state exposes section choices, a horizontally scrollable shortcut
+  strip, and fixed Keyboard and Compose actions.
 - Escape, navigation, and Scroll require one tap.
-- No pinned action is hidden at the initial portrait viewport.
+- Keyboard and Compose remain visible while the shortcut strip scrolls beneath
+  them.
 - Primary targets are at least 44 × 44 px.
 - Compose opens a native multiline text area suitable for OS dictation.
 - Insert and Send have visible labels and distinct, tested behavior.

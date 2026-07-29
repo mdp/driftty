@@ -22,35 +22,71 @@ $magenta: #ff56d8;
 
   &__actions,
   &__context,
-  &__modes {
+  &__fixed-actions,
+  &__modes,
+  &__shortcuts {
     display: flex;
     gap: 1px;
   }
 
   &__actions {
+    position: relative;
     width: 100%;
     min-height: 44px;
     margin-top: 3px;
+    overflow: hidden;
   }
 
   &__modes {
     height: 31px;
     padding: 1px;
     gap: 0;
+    overflow-x: auto;
+    overscroll-behavior: none;
     background: rgba(5, 14, 18, 0.78);
     border: 1px solid rgba($cyan, 0.22);
     border-radius: 4px;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 
   &__context {
-    min-width: 0;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
+  }
 
-    .terminal-quickbar__key {
-      width: 25%;
-      min-width: 44px;
-      flex: 1 1 25%;
+  &__shortcuts {
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior: none;
+    padding-right: 94px;
+    scrollbar-width: none;
+    scroll-padding-right: 94px;
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
+
+    &::-webkit-scrollbar {
+      display: none;
     }
+  }
+
+  &__fixed-actions {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    padding-left: 6px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(5, 8, 11, 0.96) 6px,
+      rgba(5, 8, 11, 0.99) 100%
+    );
   }
 
   &__key {
@@ -95,6 +131,9 @@ $magenta: #ff56d8;
 
     &--compose {
       position: relative;
+      width: 49px;
+      min-width: 49px;
+      flex-basis: 49px;
       color: $magenta;
       border-color: rgba($magenta, 0.42);
     }
@@ -116,10 +155,10 @@ $magenta: #ff56d8;
 
   &__mode {
     position: relative;
-    min-width: 0;
+    min-width: 25%;
     height: 29px;
     padding: 0 4px;
-    flex: 1 1 25%;
+    flex: 0 0 25%;
     color: rgba(#d9eeee, 0.72);
     background: transparent;
     border: 0;
@@ -127,6 +166,7 @@ $magenta: #ff56d8;
     font: 700 11px/1 ui-monospace, monospace;
     text-transform: none;
     touch-action: manipulation;
+    scroll-snap-align: start;
 
     &[aria-pressed='true'] {
       color: $cyan;
@@ -143,6 +183,11 @@ $magenta: #ff56d8;
         background: $cyan;
         clip-path: polygon(0 0, 100% 0, 50% 100%);
       }
+    }
+
+    &:active {
+      color: $cyan;
+      background: rgba($cyan, 0.14);
     }
 
     &:focus-visible {

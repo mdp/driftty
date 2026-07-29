@@ -75,29 +75,37 @@ export class TerminalQuickbar extends Component<Props, State> {
           </span>
         )}
         <div class="terminal-quickbar__modes" aria-label="Quickbar mode">
-            {(['agent', 'nav', 'tmux', 'ctrl'] as QuickbarMode[]).map(
-              (mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  class="terminal-quickbar__mode"
-                  aria-pressed={
-                    scrollControls ? mode === 'tmux' : this.state.mode === mode
-                  }
-                  disabled={scrollControls}
-                  onPointerDown={preventTerminalFocus}
-                  onClick={() => this.selectMode(mode)}
-                >
-                  {mode === 'nav'
-                    ? 'Nav'
-                    : mode === 'tmux'
-                      ? 'tmux'
-                      : mode === 'ctrl'
-                        ? 'Ctrl'
-                        : 'Agent'}
-                </button>
-              )
-            )}
+          {(['agent', 'nav', 'tmux', 'ctrl'] as QuickbarMode[]).map(
+            (mode) => (
+              <button
+                key={mode}
+                type="button"
+                class="terminal-quickbar__mode"
+                aria-pressed={
+                  scrollControls ? mode === 'tmux' : this.state.mode === mode
+                }
+                disabled={scrollControls}
+                onPointerDown={preventTerminalFocus}
+                onClick={() => this.selectMode(mode)}
+              >
+                {mode === 'nav'
+                  ? 'Nav'
+                  : mode === 'tmux'
+                    ? 'tmux'
+                    : mode === 'ctrl'
+                      ? 'Ctrl'
+                      : 'Agent'}
+              </button>
+            )
+          )}
+          <button
+            type="button"
+            class="terminal-quickbar__mode terminal-quickbar__mode--more"
+            onPointerDown={preventTerminalFocus}
+            onClick={onOpenMenu}
+          >
+            More
+          </button>
         </div>
         <div
           class="terminal-quickbar__actions"
@@ -107,48 +115,44 @@ export class TerminalQuickbar extends Component<Props, State> {
               : `${this.modeLabel(this.state.mode)} controls`
           }
         >
-          <QuickKey label="Esc" action="escape" onAction={onAction} danger />
-          <div class="terminal-quickbar__context">
-            {this.renderControls(
-              scrollControls
-                ? tmuxScrollControls
-                : quickbarControls[this.state.mode],
-              onAction,
-              onControl
-            )}
+          <div class="terminal-quickbar__shortcuts">
+            <QuickKey label="Esc" action="escape" onAction={onAction} danger />
+            <div class="terminal-quickbar__context">
+              {this.renderControls(
+                scrollControls
+                  ? tmuxScrollControls
+                  : quickbarControls[this.state.mode],
+                onAction,
+                onControl
+              )}
+            </div>
           </div>
-          <button
-            type="button"
-            class="terminal-quickbar__key terminal-quickbar__key--icon"
-            onPointerDown={preventTerminalFocus}
-            onClick={onOpenKeyboard}
-            aria-label="Open full terminal keyboard"
-            title="Open full terminal keyboard"
-          >
-            <KeyboardIcon />
-          </button>
-          <button
-            type="button"
-            class="terminal-quickbar__key terminal-quickbar__key--compose"
-            onPointerDown={preventTerminalFocus}
-            onClick={onOpenComposer}
-            aria-label={
-              draftAvailable ? 'Compose, draft available' : 'Compose'
-            }
-          >
-            Compose
-            {draftAvailable && (
-              <span class="terminal-quickbar__draft" aria-hidden="true" />
-            )}
-          </button>
-          <button
-            type="button"
-            class="terminal-quickbar__key"
-            onPointerDown={preventTerminalFocus}
-            onClick={onOpenMenu}
-          >
-            More
-          </button>
+          <div class="terminal-quickbar__fixed-actions">
+            <button
+              type="button"
+              class="terminal-quickbar__key terminal-quickbar__key--icon"
+              onPointerDown={preventTerminalFocus}
+              onClick={onOpenKeyboard}
+              aria-label="Open full terminal keyboard"
+              title="Open full terminal keyboard"
+            >
+              <KeyboardIcon />
+            </button>
+            <button
+              type="button"
+              class="terminal-quickbar__key terminal-quickbar__key--compose"
+              onPointerDown={preventTerminalFocus}
+              onClick={onOpenComposer}
+              aria-label={
+                draftAvailable ? 'Compose, draft available' : 'Compose'
+              }
+            >
+              Compose
+              {draftAvailable && (
+                <span class="terminal-quickbar__draft" aria-hidden="true" />
+              )}
+            </button>
+          </div>
         </div>
       </nav>
     );
