@@ -3,6 +3,12 @@ export const MAX_RECONNECT_ATTEMPTS = 5;
 
 const BASE_RECONNECT_DELAY_MS = 500;
 
+export function connectionStateAfterClose(
+  code: number,
+): 'exited' | 'disconnected' {
+  return code === 1000 ? 'exited' : 'disconnected';
+}
+
 export function reconnectDelay(attempt: number): number {
   return BASE_RECONNECT_DELAY_MS * 2 ** Math.max(0, attempt - 1);
 }

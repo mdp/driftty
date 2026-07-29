@@ -15,3 +15,13 @@ export function randomSessionName(random = Math.random): string {
   const name = names[Math.floor(random() * names.length)]!;
   return `${adjective}-${name}`;
 }
+
+export function sessionSlug(value: string): string {
+  const slug = value.trim();
+  if (slug.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    throw new Error(
+      'shell name must use lowercase letters, numbers, and single hyphens (64 characters max)',
+    );
+  }
+  return slug;
+}

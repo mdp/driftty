@@ -56,6 +56,7 @@ live in a named Docker volume.
 profiles:
   - slug: baz
     label: Baz server
+    host_label: Baz
     host: baz.example.net
     port: 22
     user: mark
@@ -73,6 +74,8 @@ profiles:
 
 `slug` must contain lowercase letters, numbers, and hyphens and is exposed at
 `/baz/`. Slugs must be unique. `label`, `host`, `user`, and `key` are required;
+`host_label` controls the heading used when profiles are grouped by SSH host and
+defaults to `label`. Give profiles for the same host the same `host_label`.
 `port` defaults to 22. A key is a filename directly under `/keys`—absolute
 paths and traversal are rejected. Invalid configuration or unreadable keys
 stop the gateway. `autorun` is optional. When set, it runs in the remote
@@ -85,8 +88,9 @@ Their host page lists configured pinned sessions and managed sessions at
 created on first click if it is not already running. `directory` sets its
 starting directory, and an optional `command` replaces the normal login shell.
 
-`new_sessions` adds a one-click `+` action. It creates a Docker-style name such
-as `clever-turing`, starts a detached tmux session, and redirects to it.
+`new_sessions` adds a `+` action to the host heading. Its form starts with a
+Docker-style name such as `clever-turing`; edit that value to choose another
+lowercase, URL-safe name before creating the detached tmux session.
 Generated tmux sessions use the configured `prefix` (default `ttyd-`) so the
 gateway discovers only sessions it owns and does not expose unrelated tmux
 work. `max` optionally limits the number of managed sessions. Set
@@ -101,8 +105,12 @@ persistence tooling if sessions must survive them.
 
 Profiles without `sessions` or `new_sessions` retain the original behavior:
 `autorun` optionally selects their command, and `/baz/` opens a terminal
-directly. One profile redirects `/` to its host or terminal; multiple profiles
-show a host picker containing labels only.
+directly. The picker groups profiles by SSH host and flattens pinned and
+spawned shells into the same group without exposing connection details.
+
+When a shell exits successfully, ttyd closes its WebSocket normally. The client
+does not reconnect in that case and instead shows a persistent **Exited**
+screen. Unexpected network disconnects still use automatic reconnect.
 
 Each browser connection gets a separate SSH process. Session-routed profiles
 attach that process to the selected persistent tmux session. SSH uses public-key

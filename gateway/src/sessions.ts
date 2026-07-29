@@ -1,6 +1,6 @@
 import type {FixedSession, Profile} from './profiles';
 import {sshBaseCommand} from './ssh';
-import {randomSessionName} from './names';
+import {randomSessionName, sessionSlug} from './names';
 
 export interface TmuxSession {
   slug: string;
@@ -91,7 +91,10 @@ export async function ensureFixedSession(
 export async function createManagedSession(
   profile: Profile,
   knownHosts: string,
-  random = Math.random,
+  {
+    name: requestedName,
+    random = Math.random,
+  }: {name?: string; random?: () => number} = {},
 ): Promise<TmuxSession> {
   const settings = profile.newSessions;
   if (!settings) throw new Error(`profile ${profile.slug} does not allow new sessions`);
@@ -104,15 +107,23 @@ export async function createManagedSession(
     ...existing.map((session) => session.slug),
     ...profile.sessions.map((session) => session.slug),
   ]);
-  let slug = '';
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const candidate = randomSessionName(random);
-    if (!used.has(candidate)) {
-      slug = candidate;
-      break;
+  let slug: string;
+  if (requestedName !== undefined) {
+    slug = sessionSlug(requestedName);
+    if (used.has(slug)) {
+      throw new Error(`shell name "${slug}" is already in use`);
     }
+  } else {
+    slug = '';
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const candidate = randomSessionName(random);
+      if (!used.has(candidate)) {
+        slug = candidate;
+        break;
+      }
+    }
+    if (!slug) throw new Error('could not generate a unique session name');
   }
-  if (!slug) throw new Error('could not generate a unique session name');
   const name = `${settings.prefix}${slug}`;
   await remote(profile, knownHosts, createCommand(name, settings.directory, settings.command));
   return {

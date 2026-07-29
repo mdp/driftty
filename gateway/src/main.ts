@@ -182,14 +182,31 @@ const picker = Bun.serve({
   port: pickerPort,
   async fetch(request) {
     const url = new URL(request.url);
-    if (url.pathname === '/') return pickerResponse(profiles);
+    if (url.pathname === '/') {
+      if (request.method !== 'GET') return new Response('Method not allowed', {status: 405});
+      const sessionsByProfile = new Map<string, TmuxSession[]>();
+      await Promise.all(routedProfiles.map(async (profile) => {
+        try {
+          sessionsByProfile.set(profile.slug, withMissingFixed(profile, await discover(profile)));
+        } catch (error) {
+          console.error(`could not discover tmux sessions for ${profile.slug}:`, error);
+          sessionsByProfile.set(profile.slug, withMissingFixed(profile, []));
+        }
+      }));
+      await reloadCaddy();
+      return pickerResponse(profiles, sessionsByProfile);
+    }
     const parts = url.pathname.split('/').filter(Boolean);
     const profile = parts[0] ? profileBySlug.get(parts[0]) : undefined;
     if (!profile || !profile.sessionRouting) return new Response('Not found', {status: 404});
 
     if (request.method === 'POST' && parts.length === 2 && parts[1] === 'sessions') {
       try {
-        const session = await createManagedSession(profile, knownHosts);
+        const form = await request.formData();
+        const name = form.get('name');
+        const session = await createManagedSession(profile, knownHosts, {
+          name: typeof name === 'string' ? name : undefined,
+        });
         await spawnSessionTtyd(profile, session);
         await reloadCaddy();
         return Response.redirect(new URL(`/${profile.slug}/${session.slug}/`, url), 303);

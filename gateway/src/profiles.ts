@@ -6,6 +6,7 @@ import {parse} from 'yaml';
 export interface Profile {
   slug: string;
   label: string;
+  hostLabel: string;
   host: string;
   port: number;
   user: string;
@@ -167,6 +168,8 @@ export async function parseProfiles(
     return {
       slug,
       label: required(value.label, 'label', index),
+      hostLabel: optionalString(value.host_label, 'host_label', `profile ${index + 1}`)
+        ?? required(value.label, 'label', index),
       host: required(value.host, 'host', index),
       port,
       user: required(value.user, 'user', index),

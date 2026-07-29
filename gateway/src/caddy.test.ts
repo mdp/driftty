@@ -3,7 +3,7 @@ import {caddyConfig} from './caddy';
 import type {LegacyRoute} from './caddy';
 
 const profile = (slug: string, port: number): LegacyRoute => ({
-  slug, label: slug, host: 'example.net', port: 22, user: 'mark',
+  slug, label: slug, hostLabel: slug, host: 'example.net', port: 22, user: 'mark',
   key: slug, keyPath: `/keys/${slug}`, ttydPort: port,
   sessions: [], sessionRouting: false,
 });

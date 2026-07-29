@@ -13,9 +13,17 @@ describe('profile parsing', () => {
   test('loads a profile and defaults the port', async () => {
     const profiles = await parseProfiles(valid, {checkKeys: false});
     expect(profiles[0]).toMatchObject({
-      slug: 'baz', port: 22, keyPath: '/keys/baz',
+      slug: 'baz', hostLabel: 'Baz', port: 22, keyPath: '/keys/baz',
       sessions: [], sessionRouting: false,
     });
+  });
+
+  test('loads a separate display label for grouping profiles by host', async () => {
+    const profiles = await parseProfiles(
+      valid.replace('label: Baz', 'label: MDP profile\n    host_label: Monaco'),
+      {checkKeys: false},
+    );
+    expect(profiles[0]?.hostLabel).toBe('Monaco');
   });
 
   test('loads fixed and one-click session configuration', async () => {

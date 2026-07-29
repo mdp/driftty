@@ -15,6 +15,7 @@ import {
 } from '../../keyboard-overlay/keys';
 import {
   MAX_RECONNECT_ATTEMPTS,
+  connectionStateAfterClose,
   reconnectDelay,
   storeAutoReconnect,
 } from '../../../reconnect';
@@ -128,7 +129,9 @@ export class Xterm {
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private manualReconnectKey?: IDisposable;
   private disposed = false;
+  private exited = false;
   private reconnectListener?: (needsManualReconnect: boolean) => void;
+  private exitListener?: () => void;
   private inputModifier?: InputModifier;
   private modifierListener?: (modifier?: InputModifier) => void;
   private touchSelectionListener?: (box?: TouchSelectionBox) => void;
@@ -251,7 +254,12 @@ export class Xterm {
     this.reconnectListener = listener;
   }
 
+  public onExit(listener?: () => void) {
+    this.exitListener = listener;
+  }
+
   public reconnectNow() {
+    if (this.exited) return;
     clearTimeout(this.reconnectTimer);
     this.manualReconnectKey?.dispose();
     this.manualReconnectKey = undefined;
@@ -709,6 +717,17 @@ export class Xterm {
     const { doReconnect, overlayAddon } = this;
     overlayAddon.showOverlay('Connection Closed');
     this.clearListeners();
+
+    if (!this.disposed && connectionStateAfterClose(event.code) === 'exited') {
+      clearTimeout(this.reconnectTimer);
+      this.exited = true;
+      this.doReconnect = false;
+      this.terminal.options.disableStdin = true;
+      this.reconnectListener?.(false);
+      this.exitListener?.();
+      overlayAddon.showOverlay('Exited');
+      return;
+    }
 
     if (
       !this.disposed &&

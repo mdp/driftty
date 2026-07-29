@@ -1,6 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
   AUTO_RECONNECT_STORAGE_KEY,
+  connectionStateAfterClose,
   initialAutoReconnect,
   reconnectDelay,
   storeAutoReconnect,
@@ -30,5 +31,11 @@ describe('automatic reconnect settings', () => {
     vi.stubGlobal('localStorage', {setItem});
     storeAutoReconnect(false);
     expect(setItem).toHaveBeenCalledWith(AUTO_RECONNECT_STORAGE_KEY, 'false');
+  });
+
+  it('treats ttyd normal close as terminal exit and other closes as disconnects', () => {
+    expect(connectionStateAfterClose(1000)).toBe('exited');
+    expect(connectionStateAfterClose(1006)).toBe('disconnected');
+    expect(connectionStateAfterClose(1011)).toBe('disconnected');
   });
 });

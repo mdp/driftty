@@ -21,6 +21,7 @@ interface State {
   showComposer: boolean;
   composerValue: string;
   reconnectRequired: boolean;
+  exited: boolean;
   webKeyboardHeight: number;
   touchSelection?: TouchSelectionBox;
 }
@@ -44,6 +45,7 @@ export class Terminal extends Component<Props, State> {
       showComposer: false,
       composerValue: '',
       reconnectRequired: false,
+      exited: false,
       webKeyboardHeight: 0,
     };
   }
@@ -56,6 +58,7 @@ export class Terminal extends Component<Props, State> {
     this.xterm.onReconnectRequired((reconnectRequired) =>
       this.setState({reconnectRequired})
     );
+    this.xterm.onExit(() => this.setState({exited: true}));
     this.xterm.onTouchSelection((touchSelection) =>
       this.setState({touchSelection})
     );
@@ -85,6 +88,7 @@ export class Terminal extends Component<Props, State> {
     );
     window.removeEventListener('resize', this.handleViewportChange);
     this.xterm.onReconnectRequired();
+    this.xterm.onExit();
     this.xterm.onTouchSelection();
     this.xterm.dispose();
   }
@@ -99,6 +103,7 @@ export class Terminal extends Component<Props, State> {
       showComposer,
       composerValue,
       reconnectRequired,
+      exited,
       webKeyboardHeight,
       touchSelection,
     }: State
@@ -161,6 +166,21 @@ export class Terminal extends Component<Props, State> {
           >
             Reconnect
           </button>
+        )}
+        {exited && (
+          <div
+            class="terminal-exited"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="terminal-exited-title"
+          >
+            <div class="terminal-exited__panel">
+              <div class="terminal-exited__signal" aria-hidden="true">●</div>
+              <h1 id="terminal-exited-title">Exited</h1>
+              <p>This shell has ended and will not reconnect.</p>
+              <a href="/">All terminals</a>
+            </div>
+          </div>
         )}
         {showComposer && (
           <VoiceComposer
