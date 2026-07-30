@@ -4,11 +4,11 @@
   role="img"
   aria-labelledby="title"
 >
-  <title id="title">DrifTTY ship icon</title>
+  <title id="title">driftty ship logo</title>
 
   <g
     fill="none"
-    stroke="currentColor"
+    stroke="#39e7ff"
     stroke-width="4"
     stroke-linecap="round"
     stroke-linejoin="round"
@@ -19,7 +19,7 @@
     <!-- Pennant -->
     <path
       d="M32 10 22 14l10 4z"
-      fill="currentColor"
+      fill="#39e7ff"
       stroke="none"
     />
 

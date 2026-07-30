@@ -1,19 +1,51 @@
-# driftty
+<p align="center">
+  <img src="./driftty.svg" width="128" alt="driftty ship logo">
+</p>
 
-A mobile-first [ttyd](https://github.com/tsl0922/ttyd) client, packaged as a
-general terminal image and an optional multi-host SSH gateway.
+<h1 align="center">driftty</h1>
 
-The mobile controls include an auto-reconnect setting, enabled by default.
-Unexpected disconnects are retried five times with exponential backoff; after
-that, the terminal waits for the user to tap **Reconnect** or press Enter.
+<p align="center">
+  A mobile-first web terminal and an installable gateway for reaching your
+  shells from anywhere.
+</p>
 
-The interface adds a safe-area-aware cyberpunk theme, an input/paste and
-dictation composer, a movable two-action launcher, navigation and tmux pads, curated Ctrl keys,
-and one-shot modifiers. The production client remains a single HTML file.
+driftty turns a command-line session into a terminal that works comfortably in
+a phone browser. It builds on [ttyd](https://github.com/tsl0922/ttyd) and adds
+the controls, viewport behavior, and connection handling that terminal work on
+a small touchscreen needs.
 
-## Run any command
+Run it as a lightweight container around any command, or use the gateway to
+reach multiple SSH hosts and persistent tmux sessions through one web entry
+point. The gateway image inherits the exact client from the terminal image, so
+both ways of running driftty provide the same mobile experience.
 
-The generic image has no SSH, Cloudflare, profile, or gateway dependencies:
+## What it provides
+
+- A fixed-size terminal viewport with presets, custom dimensions, pinch zoom,
+  and double-tap fitting.
+- Controls for common terminal keys, tmux actions, navigation, and one-shot
+  modifiers without opening a full software keyboard.
+- A composer for typing, pasting, and dictating longer commands before sending
+  them to the terminal.
+- Layout behavior that accounts for phone safe areas and on-screen keyboards.
+- Automatic reconnection for interrupted networks and a clear final state when
+  the underlying shell has actually exited.
+- A single-file web client embedded directly into the container image.
+
+## Two ways to run driftty
+
+| | Mobile terminal image | Gateway image |
+| --- | --- | --- |
+| Use it for | One command or local shell | Multiple SSH hosts and tmux shells |
+| Image | `ghcr.io/mdp/driftty` | `ghcr.io/mdp/driftty-gateway` |
+| Configuration | Docker command arguments | YAML profiles and SSH keys |
+| Routing | One terminal | Host picker and stable shell URLs |
+| Persistence | Lifetime of the command | Remote tmux sessions survive gateway restarts |
+
+### Run any command
+
+The mobile terminal image has no SSH, profile, gateway, or Cloudflare
+dependencies. Pass it the command you want ttyd to run:
 
 ```bash
 docker run --rm -p 7681:7681 \
@@ -21,20 +53,23 @@ docker run --rm -p 7681:7681 \
   sh
 ```
 
-Open <http://localhost:7681>. Arguments are passed directly to ttyd, so ttyd
-options can precede the child command:
+Open <http://localhost:7681>.
+
+Arguments are passed directly to ttyd, so ttyd options can come before the
+child command:
 
 ```bash
-docker run --rm -p 8080:8080 ghcr.io/mdp/driftty:latest \
+docker run --rm -p 8080:8080 \
+  ghcr.io/mdp/driftty:latest \
   --port 8080 --client-option titleFixed="My terminal" bash
 ```
 
-The image binds on all interfaces, enables writable input, and embeds the
-mobile client at `/usr/share/ttyd/index.html`.
+The image enables writable input and embeds the complete client at
+`/usr/share/ttyd/index.html`.
 
-## Five-minute SSH gateway
+### Install the SSH gateway
 
-Download and unpack the Compose bundle from the latest GitHub release, then:
+Download the Compose bundle from the latest GitHub release, unpack it, and run:
 
 ```bash
 cp .env.example .env
@@ -42,19 +77,23 @@ cp profiles.example.yaml config/profiles.yaml
 docker compose run --rm keygen baz
 ```
 
-1. Put the Cloudflare remotely managed tunnel token in `.env`.
-2. Edit `config/profiles.yaml` with the SSH host, user, port, and key name.
-3. Install the printed public key using the displayed `ssh-copy-id` command.
+Then:
+
+1. Add the Cloudflare remotely managed tunnel token to `.env`.
+2. Edit `config/profiles.yaml` with your SSH host, user, port, and key name.
+3. Install the generated public key using the printed `ssh-copy-id` command.
 4. Point the Cloudflare tunnel origin to `http://gateway:7681`.
-5. Run `docker compose up -d`.
+5. Start the gateway with `docker compose up -d`.
 
-Each versioned bundle pins `driftty-gateway` to the matching release by
-default. `cloudflared` remains independently updated by its upstream `latest`
-tag.
+Each release bundle pins the gateway image to the matching driftty version.
+SSH configuration and private keys are mounted read-only. Learned host keys
+live in a named Docker volume, and the key generator is the only process given
+writable access to the keys directory.
 
-The gateway mounts `config/profiles.yaml` and `keys/` read-only. Only the
-one-shot key generator receives a writable key mount. Learned SSH host keys
-live in a named Docker volume.
+## Configure hosts and shells
+
+A profile can open a direct SSH shell, expose pinned tmux sessions, allow new
+managed sessions, or combine pinned and managed sessions:
 
 ```yaml
 profiles:
@@ -76,59 +115,52 @@ profiles:
       # max: 20
 ```
 
-`slug` must contain lowercase letters, numbers, and hyphens and is exposed at
-`/baz/`. Slugs must be unique. `label`, `host`, `user`, and `key` are required;
-`host_label` controls the heading used when profiles are grouped by SSH host and
-defaults to `label`. Give profiles for the same host the same `host_label`.
-`port` defaults to 22. A key is a filename directly under `/keys`—absolute
-paths and traversal are rejected. Invalid configuration or unreadable keys
-stop the gateway. `autorun` is optional. When set, it runs in the remote
-login shell with `TTYD_SESSION=1`; when the command exits, the terminal
-connection closes. Omit it to open the normal interactive login shell.
+The profile above appears at `/baz/`. Its pinned terminal appears at
+`/baz/mdp/`, and newly created shells receive their own stable URLs.
 
-Profiles with `sessions` or `new_sessions` enabled use tmux session routing.
-Their host page lists configured pinned sessions and managed sessions at
-`/baz/`; terminals live at `/baz/session-name/`. A configured session is
-created on first click if it is not already running. `directory` sets its
-starting directory, and an optional `command` replaces the normal login shell.
+`slug`, `label`, `host`, `user`, and `key` are required. The port defaults to
+22. Profiles that share a host are grouped together; `host_label` controls
+that group's heading and defaults to `label`. Configuration is validated
+before the gateway starts, including key paths, duplicate names, incompatible
+routing options, and session limits.
 
-`new_sessions` adds a `+` action to the host heading. Its form starts with a
-Docker-style name such as `clever-turing`; edit that value to choose another
-lowercase, URL-safe name before creating the detached tmux session.
-Generated tmux sessions use the configured `prefix` (default `ttyd-`) so the
-gateway discovers only sessions it owns and does not expose unrelated tmux
-work. `max` optionally limits the number of managed sessions. Set
-`new_sessions: false`, set `enabled: false`, or omit it to prevent session
-creation.
+Profiles without `sessions` or `new_sessions` open a direct interactive login
+shell. They may specify `autorun` to run a command in the remote login shell
+instead.
 
-The remote tmux server is the session registry. On gateway restart, the router
-queries tmux and reconstructs its routes, so browser disconnects and gateway
-container restarts do not close sessions. If a session has ended, reloading its
-URL returns to the host page. Remote host restarts still require tmux
-persistence tooling if sessions must survive them.
+Profiles with session routing use the remote tmux server as their shell
+registry:
 
-Profiles without `sessions` or `new_sessions` retain the original behavior:
-`autorun` optionally selects their command, and `/baz/` opens a terminal
-directly. The picker groups profiles by SSH host and flattens pinned and
-spawned shells into the same group without exposing connection details.
+- Pinned sessions are created when first opened if they are not already
+  running.
+- Managed sessions use a configured prefix so driftty never exposes unrelated
+  tmux work.
+- The optional `max` value limits how many managed sessions can be created.
+- On restart, the gateway discovers the existing tmux sessions and rebuilds
+  their routes.
 
-When a shell exits successfully, ttyd closes its WebSocket normally. The client
-does not reconnect in that case and instead shows a persistent **Exited**
-screen. Unexpected network disconnects still use automatic reconnect.
+Gateway restarts and browser disconnects therefore do not end remote work.
+Surviving a restart of the remote SSH host itself still requires tmux
+persistence tooling on that host.
 
-Each browser connection gets a separate SSH process. Session-routed profiles
-attach that process to the selected persistent tmux session. SSH uses public-key
-authentication only, learns new host keys with `accept-new`, rejects changed
-keys, and exports `TTYD_SESSION=1` in the remote login shell. Caddy is an
-internal path/WebSocket router only; it provides no authentication. Configure
-access policy in Cloudflare. Restart the gateway after editing profiles.
+## Connection and security model
 
-## Local Compose development
+Each browser connection gets a separate SSH process. Session-routed
+connections attach that process to the selected tmux session.
 
-The development Compose file runs Vite with hot module replacement behind a
-required secret URL path. Behind it, the locally built generic ttyd image runs
-an isolated Alpine `sh` prompt. There are no SSH keys, remote hosts, gateway
-profiles, or Cloudflare credentials in the development stack.
+SSH uses public-key authentication only, accepts previously unseen host keys,
+and rejects changed keys. Caddy handles internal HTTP and WebSocket routing; it
+does not provide authentication. Configure authentication and access policy at
+the tunnel or reverse-proxy layer.
+
+When a shell exits normally, driftty stops reconnecting and shows an **Exited**
+screen. Unexpected network interruptions use automatic reconnection with
+backoff.
+
+## Local development
+
+The development stack runs Vite with hot module replacement and an isolated
+Alpine shell:
 
 ```bash
 DRIFTTY_DEV_TOKEN=abc123secret \
@@ -137,67 +169,18 @@ DRIFTTY_DEV_TOKEN=abc123secret \
   docker compose -f compose.dev.yaml up --build -d
 ```
 
-The source tree is bind-mounted, so edits under `src/` reload in the browser
-immediately. Re-run with `--build` after changing dependencies or the
-Dockerfile. Follow the development output with:
+The source tree is mounted into the web container, so changes under `src/`
+reload in the browser. The development endpoint requires the configured secret
+path and is intended for a trusted LAN or tailnet.
 
-```bash
-docker compose -f compose.dev.yaml logs -f web terminal
-```
-
-The web service listens only on `127.0.0.1` and the configured Tailscale IPv4,
-not on the LAN or other host interfaces. Open its Tailscale IP or MagicDNS
-name with port 7681 and the secret path, for example
-`http://aachen.weasel-dojo.ts.net:7681/abc123secret/`. Requests without the
-configured access cookie return 404. Visiting the secret path sets an
-HttpOnly, same-site cookie and redirects to `/`, allowing Vite modules, HMR,
-and terminal WebSockets without exposing the token on every request. The token
-may contain letters, numbers, underscores, and hyphens. Use a long random value
-and do not commit it.
-
-Use another host port when 7681 is occupied:
-
-```bash
-DRIFTTY_DEV_TOKEN=abc123secret \
-  DRIFTTY_DEV_TAILSCALE_IP="$(tailscale ip -4)" \
-  DRIFTTY_DEV_HOSTNAME=aachen.weasel-dojo.ts.net \
-  DRIFTTY_DEV_PORT=8080 \
-  docker compose -f compose.dev.yaml up --build -d
-```
-
-Anyone who can reach that port can use the demo shell. The terminal container
-has no host mounts, uses a read-only filesystem with an ephemeral `/tmp`, and
-runs without Linux capabilities or privilege escalation. Still, expose it only
-on a trusted LAN or tailnet, not directly to the public internet.
-
-Stop and remove the development containers with
-`docker compose -f compose.dev.yaml down`.
-
-## Locally built gateway stack
-
-`compose.local.yaml` has the same SSH gateway, key mounts, known-hosts volume,
-and Cloudflare tunnel as `compose.yaml`, but builds the gateway image from the
-current checkout and tags it `driftty-gateway:local`.
+To run the complete gateway from the current checkout:
 
 ```bash
 docker compose -f compose.local.yaml up --build -d
 ```
 
-This uses the same `config/profiles.yaml`, `keys/`, and
-`CLOUDFLARE_TUNNEL_TOKEN` as the regular stack. Because both files intentionally
-use the `driftty` Compose project name, switch between the registry and
-local-build versions by running `up -d` with the desired file:
-
-```bash
-# Return to the registry image
-docker compose -f compose.yaml up -d
-```
-
-Generate a key with the locally built tool using:
-
-```bash
-docker compose -f compose.local.yaml run --build --rm keygen baz
-```
+This uses the same `config/profiles.yaml`, `keys/`, known-hosts volume, and
+tunnel token as the released stack while building `driftty-gateway:local`.
 
 ## Build and test
 
@@ -212,20 +195,18 @@ docker build --target gateway -t driftty-gateway .
 CLOUDFLARE_TUNNEL_TOKEN=validation docker compose config --quiet
 ```
 
-Create the copyable release archive with `npm run release:bundle -- 3.0.0`.
+Create a versioned gateway bundle with:
 
-## Images and releases
+```bash
+npm run release:bundle -- 3.0.0
+```
 
-- `ghcr.io/mdp/driftty`: mobile terminal
-- `ghcr.io/mdp/driftty-gateway`: SSH profile gateway
-- `main` publishes `edge`
-- `vX.Y.Z` publishes `X.Y.Z` and `latest`
-
-Both images are published for Linux AMD64 and ARM64.
+Images are published for Linux AMD64 and ARM64. The `main` branch publishes
+`edge`; a `vX.Y.Z` tag publishes `X.Y.Z` and `latest`.
 
 ## Attribution
 
-MIT licensed. The client began as the ttyd web client by
+driftty is MIT licensed. The client began with the ttyd web client by
 [Shuanglei Tao](https://github.com/tsl0922/ttyd) and the overlay-key project by
 [Masahiro Wada](https://github.com/ar90n/ttyd-overlay-keys-html). Their work and
 copyright notices are retained with thanks.
