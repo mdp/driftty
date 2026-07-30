@@ -1,4 +1,4 @@
-# ttyd-mobile
+# driftty
 
 A mobile-first [ttyd](https://github.com/tsl0922/ttyd) client, packaged as a
 general terminal image and an optional multi-host SSH gateway.
@@ -17,7 +17,7 @@ The generic image has no SSH, Cloudflare, profile, or gateway dependencies:
 
 ```bash
 docker run --rm -p 7681:7681 \
-  ghcr.io/mdp/ttyd-mobile:latest \
+  ghcr.io/mdp/driftty:latest \
   sh
 ```
 
@@ -25,7 +25,7 @@ Open <http://localhost:7681>. Arguments are passed directly to ttyd, so ttyd
 options can precede the child command:
 
 ```bash
-docker run --rm -p 8080:8080 ghcr.io/mdp/ttyd-mobile:latest \
+docker run --rm -p 8080:8080 ghcr.io/mdp/driftty:latest \
   --port 8080 --client-option titleFixed="My terminal" bash
 ```
 
@@ -47,6 +47,10 @@ docker compose run --rm keygen baz
 3. Install the printed public key using the displayed `ssh-copy-id` command.
 4. Point the Cloudflare tunnel origin to `http://gateway:7681`.
 5. Run `docker compose up -d`.
+
+Each versioned bundle pins `driftty-gateway` to the matching release by
+default. `cloudflared` remains independently updated by its upstream `latest`
+tag.
 
 The gateway mounts `config/profiles.yaml` and `keys/` read-only. Only the
 one-shot key generator receives a writable key mount. Learned SSH host keys
@@ -127,9 +131,9 @@ an isolated Alpine `sh` prompt. There are no SSH keys, remote hosts, gateway
 profiles, or Cloudflare credentials in the development stack.
 
 ```bash
-TTYD_MOBILE_DEV_TOKEN=abc123secret \
-  TTYD_MOBILE_DEV_TAILSCALE_IP="$(tailscale ip -4)" \
-  TTYD_MOBILE_DEV_HOSTNAME=aachen.weasel-dojo.ts.net \
+DRIFTTY_DEV_TOKEN=abc123secret \
+  DRIFTTY_DEV_TAILSCALE_IP="$(tailscale ip -4)" \
+  DRIFTTY_DEV_HOSTNAME=aachen.weasel-dojo.ts.net \
   docker compose -f compose.dev.yaml up --build -d
 ```
 
@@ -154,10 +158,10 @@ and do not commit it.
 Use another host port when 7681 is occupied:
 
 ```bash
-TTYD_MOBILE_DEV_TOKEN=abc123secret \
-  TTYD_MOBILE_DEV_TAILSCALE_IP="$(tailscale ip -4)" \
-  TTYD_MOBILE_DEV_HOSTNAME=aachen.weasel-dojo.ts.net \
-  TTYD_MOBILE_DEV_PORT=8080 \
+DRIFTTY_DEV_TOKEN=abc123secret \
+  DRIFTTY_DEV_TAILSCALE_IP="$(tailscale ip -4)" \
+  DRIFTTY_DEV_HOSTNAME=aachen.weasel-dojo.ts.net \
+  DRIFTTY_DEV_PORT=8080 \
   docker compose -f compose.dev.yaml up --build -d
 ```
 
@@ -173,7 +177,7 @@ Stop and remove the development containers with
 
 `compose.local.yaml` has the same SSH gateway, key mounts, known-hosts volume,
 and Cloudflare tunnel as `compose.yaml`, but builds the gateway image from the
-current checkout and tags it `ttyd-mobile-gateway:local`.
+current checkout and tags it `driftty-gateway:local`.
 
 ```bash
 docker compose -f compose.local.yaml up --build -d
@@ -181,7 +185,7 @@ docker compose -f compose.local.yaml up --build -d
 
 This uses the same `config/profiles.yaml`, `keys/`, and
 `CLOUDFLARE_TUNNEL_TOKEN` as the regular stack. Because both files intentionally
-use the `ttyd-mobile` Compose project name, switch between the registry and
+use the `driftty` Compose project name, switch between the registry and
 local-build versions by running `up -d` with the desired file:
 
 ```bash
@@ -203,8 +207,8 @@ Requirements: Node 24+, Bun, and Docker.
 npm ci
 npm run test:all
 npm run build
-docker build --target generic -t ttyd-mobile .
-docker build --target gateway -t ttyd-mobile-gateway .
+docker build --target generic -t driftty .
+docker build --target gateway -t driftty-gateway .
 CLOUDFLARE_TUNNEL_TOKEN=validation docker compose config --quiet
 ```
 
@@ -212,8 +216,8 @@ Create the copyable release archive with `npm run release:bundle -- 3.0.0`.
 
 ## Images and releases
 
-- `ghcr.io/mdp/ttyd-mobile`: generic terminal
-- `ghcr.io/mdp/ttyd-mobile-gateway`: SSH profile gateway
+- `ghcr.io/mdp/driftty`: mobile terminal
+- `ghcr.io/mdp/driftty-gateway`: SSH profile gateway
 - `main` publishes `edge`
 - `vX.Y.Z` publishes `X.Y.Z` and `latest`
 

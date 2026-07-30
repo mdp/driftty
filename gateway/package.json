@@ -1,5 +1,5 @@
 {
-  "name": "@ttyd-mobile/gateway",
+  "name": "@driftty/gateway",
   "private": true,
   "type": "module",
   "dependencies": {

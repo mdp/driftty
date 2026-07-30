@@ -1,8 +1,8 @@
-name: ttyd-mobile
+name: driftty
 
 services:
   gateway:
-    image: ghcr.io/mdp/ttyd-mobile-gateway:${TTYD_MOBILE_TAG:-latest}
+    image: ghcr.io/mdp/driftty-gateway:${DRIFTTY_TAG:-latest}
     volumes:
       - ./config/profiles.yaml:/config/profiles.yaml:ro
       - ./keys:/keys:ro
@@ -26,8 +26,8 @@ services:
     networks: [terminal]
 
   keygen:
-    image: ghcr.io/mdp/ttyd-mobile-gateway:${TTYD_MOBILE_TAG:-latest}
-    entrypoint: ["/usr/local/bin/ttyd-mobile-keygen"]
+    image: ghcr.io/mdp/driftty-gateway:${DRIFTTY_TAG:-latest}
+    entrypoint: ["/usr/local/bin/driftty-keygen"]
     volumes:
       - ./keys:/keys
     profiles: [tools]

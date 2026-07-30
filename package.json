@@ -1,10 +1,10 @@
 {
   "private": true,
-  "name": "ttyd-mobile",
+  "name": "driftty",
   "version": "3.0.0",
-  "description": "Mobile-friendly ttyd client and optional multi-host SSH gateway",
+  "description": "Mobile-first tty gateway and terminal image",
   "repository": {
-    "url": "https://github.com/mdp/ttyd-mobile.git",
+    "url": "https://github.com/mdp/driftty.git",
     "type": "git"
   },
   "author": "Mark Percival",

@@ -17,7 +17,7 @@ if [ -e "$private" ] || [ -e "$public" ]; then
 fi
 
 umask 077
-ssh-keygen -q -t ed25519 -N '' -C "ttyd-mobile:$slug" -f "$private"
+ssh-keygen -q -t ed25519 -N '' -C "driftty:$slug" -f "$private"
 chmod 0600 "$private"
 chmod 0644 "$public"
 

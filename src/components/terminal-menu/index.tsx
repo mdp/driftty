@@ -7,7 +7,7 @@ import {
   fixedTerminalSize,
   terminalViewportSizes,
   type TerminalViewportSize,
-} from '../terminal/viewport-size';
+} from '../terminal/fixed-mobile-viewport';
 import './terminal-menu.scss';
 
 interface Props {

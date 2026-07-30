@@ -1,6 +1,5 @@
-import type {Profile} from './profiles';
-
-export interface LegacyRoute extends Profile {
+export interface LegacyRoute {
+  slug: string;
   ttydPort: number;
 }
 

@@ -1,19 +1,19 @@
-name: ttyd-mobile-dev
+name: driftty-dev
 
 services:
   web:
-    image: ttyd-mobile-web:dev
+    image: driftty-web:dev
     build:
       context: .
       target: web-development
     command: npm run dev -- --host 0.0.0.0
     environment:
-      DEV_ACCESS_TOKEN: "${TTYD_MOBILE_DEV_TOKEN:?Set TTYD_MOBILE_DEV_TOKEN to a URL-safe secret}"
-      DEV_ALLOWED_HOST: "${TTYD_MOBILE_DEV_HOSTNAME:?Set TTYD_MOBILE_DEV_HOSTNAME to this host's Tailscale MagicDNS name}"
+      DEV_ACCESS_TOKEN: "${DRIFTTY_DEV_TOKEN:?Set DRIFTTY_DEV_TOKEN to a URL-safe secret}"
+      DEV_ALLOWED_HOST: "${DRIFTTY_DEV_HOSTNAME:?Set DRIFTTY_DEV_HOSTNAME to this host's Tailscale MagicDNS name}"
       VITE_TTYD_PROXY_TARGET: http://terminal:7681
     ports:
-      - "127.0.0.1:${TTYD_MOBILE_DEV_PORT:-7681}:9000"
-      - "${TTYD_MOBILE_DEV_TAILSCALE_IP:?Set TTYD_MOBILE_DEV_TAILSCALE_IP to this host's Tailscale IPv4}:${TTYD_MOBILE_DEV_PORT:-7681}:9000"
+      - "127.0.0.1:${DRIFTTY_DEV_PORT:-7681}:9000"
+      - "${DRIFTTY_DEV_TAILSCALE_IP:?Set DRIFTTY_DEV_TAILSCALE_IP to this host's Tailscale IPv4}:${DRIFTTY_DEV_PORT:-7681}:9000"
     volumes:
       - ./src:/src/src:ro
       - ./index.html:/src/index.html:ro
@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
 
   terminal:
-    image: ttyd-mobile:dev
+    image: driftty:dev
     build:
       context: .
       target: generic

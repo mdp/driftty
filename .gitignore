@@ -5,7 +5,7 @@ node_modules/
 dist/
 build/
 release/*.tar.gz
-release/ttyd-mobile-*/
+release/driftty-*/
 gateway/node_modules/
 
 # Environment variables

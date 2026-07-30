@@ -1,14 +1,21 @@
 import {describe, expect, test} from 'bun:test';
 import {pickerResponse, sessionsResponse} from './picker';
-import type {Profile} from './profiles';
+import type {GatewayProfileView} from './gateway-plan';
 
-const profile = (slug: string, label: string): Profile => ({
-  slug, label, hostLabel: 'Monaco', host: 'secret.example.net', port: 22, user: 'secret-user',
-  key: 'secret-key', keyPath: '/keys/secret-key',
-  sessions: [], sessionRouting: false,
+const profile = (slug: string, label: string): GatewayProfileView => ({
+  slug, label, hostLabel: 'Monaco', hostGroup: 'host-1',
+  mode: 'direct', canCreateSessions: false,
 });
 
 describe('host picker', () => {
+  test('brands gateway tabs with the driftty ship favicon', async () => {
+    const response = pickerResponse([profile('baz', 'Baz')]);
+    const html = await response.text();
+
+    expect(html).toContain('data:image/svg+xml');
+    expect(html).toContain('— driftty</title>');
+  });
+
   test('shows the host group for a single profile', async () => {
     const response = pickerResponse([profile('baz', 'Baz')]);
     const body = await response.text();
@@ -32,13 +39,14 @@ describe('host picker', () => {
   test('flattens routed sessions into their host group with a named creation form', async () => {
     const login = profile('monaco', 'Name profile');
     const shells = profile('monaco-shells', 'Monaco shells');
-    shells.sessionRouting = true;
-    shells.newSessions = {prefix: 'ttyd-'};
+    shells.mode = 'registry';
+    shells.canCreateSessions = true;
     const response = pickerResponse(
       [login, shells],
       new Map([['monaco-shells', [{
         slug: 'clever-turing', name: 'ttyd-clever-turing',
-        label: 'clever-turing', created: 1785140000, attached: 0, managed: true,
+        label: 'clever-turing', created: 1785140000, attached: 0,
+        managed: true, available: true,
       }]]]),
       () => 'bold-wu',
     );
@@ -55,11 +63,12 @@ describe('host picker', () => {
 
   test('shows existing sessions and one-click creation when enabled', async () => {
     const item = profile('aachen', 'Aachen');
-    item.sessionRouting = true;
-    item.newSessions = {prefix: 'ttyd-', directory: '/home/mdp'};
+    item.mode = 'registry';
+    item.canCreateSessions = true;
     const response = sessionsResponse(item, [{
       slug: 'clever-turing', name: 'ttyd-clever-turing',
-      label: 'clever-turing', created: 1785140000, attached: 0, managed: true,
+      label: 'clever-turing', created: 1785140000, attached: 0,
+      managed: true, available: true,
     }]);
     const body = await response.text();
     expect(body).toContain('action="/aachen/sessions"');

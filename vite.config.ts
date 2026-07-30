@@ -20,7 +20,7 @@ export default defineConfig(({mode}) => {
 
   const accessPath = accessToken ? `/${accessToken}` : undefined;
   const accessCookie = accessToken
-    ? `ttyd_mobile_dev_access=${accessToken}`
+    ? `driftty_dev_access=${accessToken}`
     : undefined;
   const hasAccess = (cookieHeader: string | undefined) =>
     cookieHeader
