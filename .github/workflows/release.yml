@@ -22,11 +22,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun scripts/package-release.ts "${GITHUB_REF_NAME}"
-      - run: cp "release/ttyd-mobile-${GITHUB_REF_NAME#v}.tar.gz" release/ttyd-mobile-compose.tar.gz
+      - run: cp "release/driftty-${GITHUB_REF_NAME#v}.tar.gz" release/driftty-compose.tar.gz
       - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: release/ttyd-mobile-compose.tar.gz
+          files: release/driftty-compose.tar.gz
 
   latest:
     needs: publish
@@ -43,7 +43,7 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           version="${VERSION#v}"
-          for image in ttyd-mobile ttyd-mobile-gateway; do
+          for image in driftty driftty-gateway; do
             docker buildx imagetools create \
               -t "ghcr.io/mdp/$image:$version" \
               -t "ghcr.io/mdp/$image:latest" \

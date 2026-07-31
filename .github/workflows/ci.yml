@@ -26,21 +26,27 @@ jobs:
       - run: CLOUDFLARE_TUNNEL_TOKEN=validation docker compose config --quiet
       - name: Build images
         run: |
-          docker build --target generic -t ttyd-mobile:test .
-          docker build --target gateway -t ttyd-mobile-gateway:test .
+          docker build --target generic -t driftty:test .
+          docker build --target gateway -t driftty-gateway:test .
       - name: Smoke test arbitrary command
         run: |
-          id=$(docker run -d -p 17681:7681 ttyd-mobile:test sh)
+          id=$(docker run -d -p 17681:7681 driftty:test sh)
           trap 'docker rm -f "$id"' EXIT
           for attempt in $(seq 1 30); do
             curl -fsS http://127.0.0.1:17681/ >/dev/null && break
             sleep 1
           done
           curl -fsS http://127.0.0.1:17681/ | grep -q 'terminal-container'
+      - name: Verify both images contain the same mobile client
+        run: |
+          generic_client=$(docker run --rm --entrypoint sha256sum driftty:test /usr/share/ttyd/index.html | cut -d' ' -f1)
+          gateway_client=$(docker run --rm --entrypoint sha256sum driftty-gateway:test /usr/share/ttyd/index.html | cut -d' ' -f1)
+          test -n "$generic_client"
+          test "$generic_client" = "$gateway_client"
       - name: Validate generated Caddy configuration
         run: |
-          bun -e "import {caddyConfig} from './gateway/src/caddy.ts'; await Bun.write('/tmp/Caddyfile', caddyConfig([{slug:'baz',label:'Baz',host:'h',port:22,user:'u',key:'k',keyPath:'/keys/k',ttydPort:7800}]));"
-          docker run --rm -v /tmp/Caddyfile:/tmp/Caddyfile:ro --entrypoint caddy ttyd-mobile-gateway:test validate --config /tmp/Caddyfile --adapter caddyfile
+          bun -e "import {caddyConfig} from './gateway/src/caddy.ts'; await Bun.write('/tmp/Caddyfile', caddyConfig([{slug:'baz',ttydPort:7800}], []));"
+          docker run --rm -v /tmp/Caddyfile:/tmp/Caddyfile:ro --entrypoint caddy driftty-gateway:test validate --config /tmp/Caddyfile --adapter caddyfile
 
   publish-edge:
     if: github.event_name == 'push'

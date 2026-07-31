@@ -15,6 +15,7 @@ import {
 } from '../../keyboard-overlay/keys';
 import {
   MAX_RECONNECT_ATTEMPTS,
+  connectionStateAfterClose,
   reconnectDelay,
   storeAutoReconnect,
 } from '../../../reconnect';
@@ -51,6 +52,11 @@ enum Command {
 type Preferences = ITerminalOptions & ClientOptions;
 
 export type RendererType = 'dom' | 'canvas' | 'webgl';
+export type ConnectionState =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'disconnected';
 
 export interface ClientOptions {
   rendererType: RendererType;
@@ -84,7 +90,18 @@ export interface TouchSelectionBox {
   top: number;
   width: number;
   height: number;
-  complete: boolean;
+}
+
+export type TouchSelectionStatus =
+  | 'idle'
+  | 'armed'
+  | 'selecting'
+  | 'complete';
+
+export interface TouchSelectionState {
+  status: TouchSelectionStatus;
+  box?: TouchSelectionBox;
+  copyAvailable?: boolean;
 }
 
 function toDisposable(f: () => void): IDisposable {
@@ -128,14 +145,22 @@ export class Xterm {
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private manualReconnectKey?: IDisposable;
   private disposed = false;
+  private exited = false;
   private reconnectListener?: (needsManualReconnect: boolean) => void;
+  private exitListener?: () => void;
+  private connectionState: ConnectionState = 'connecting';
+  private connectionStateListener?: (state: ConnectionState) => void;
   private inputModifier?: InputModifier;
   private modifierListener?: (modifier?: InputModifier) => void;
-  private touchSelectionListener?: (box?: TouchSelectionBox) => void;
+  private touchSelectionListener?: (state: TouchSelectionState) => void;
   private selectionGestureDisposables: IDisposable[] = [];
   private touchSelectionText = '';
   private readonly mobileViewer = this.options.viewer.formFactor === 'mobile';
   private webKeyboardActive = false;
+  private fixedSize?: {columns: number; rows: number};
+  private cancelTouchGesture?: () => void;
+  private armTouchGesture?: () => void;
+  private viewportYBeforeKeyboard?: number;
 
   private writeFunc = (data: ArrayBuffer) =>
     this.writeData(new Uint8Array(data));
@@ -150,12 +175,77 @@ export class Xterm {
   }
 
   public fit() {
-    if (!this.opened) return;
-    this.fitAddon.fit();
+    if (!this.terminal) return;
+    if (this.fixedSize) {
+      this.terminal.resize(this.fixedSize.columns, this.fixedSize.rows);
+    } else {
+      this.fitAddon.fit();
+    }
+  }
+
+  public setFixedSize(size?: {columns: number; rows: number}) {
+    this.fixedSize = size;
+    this.fit();
+  }
+
+  public cellSize() {
+    const screen = this.terminal?.element?.querySelector(
+      '.xterm-screen'
+    ) as HTMLElement | null;
+    if (!screen || !this.terminal.cols || !this.terminal.rows) return;
+    return {
+      // offsetWidth/offsetHeight deliberately exclude the mobile viewport's
+      // CSS transform, so changing between fixed sizes does not compound zoom.
+      width: screen.offsetWidth / this.terminal.cols,
+      height: screen.offsetHeight / this.terminal.rows,
+    };
+  }
+
+  public cancelTouchSelection() {
+    this.cancelTouchGesture?.();
+  }
+
+  public armTouchSelection() {
+    this.armTouchGesture?.();
+  }
+
+  public touchSelectionBounds() {
+    return (
+      this.terminal?.element?.querySelector('.xterm-screen') as
+        | HTMLElement
+        | null
+    )?.getBoundingClientRect();
+  }
+
+  public updateTouchSelectionBox(box: TouchSelectionBox) {
+    this.touchSelectionText = this.textInsideBox(
+      box.left,
+      box.top,
+      box.left + box.width,
+      box.top + box.height,
+    );
+    this.touchSelectionListener?.({
+      status: 'complete',
+      box,
+      copyAvailable: Boolean(this.touchSelectionText),
+    });
   }
 
   public scrollToBottom() {
     this.terminal?.scrollToBottom();
+  }
+
+  public captureKeyboardPosition() {
+    if (this.viewportYBeforeKeyboard !== undefined) return;
+    this.viewportYBeforeKeyboard =
+      this.terminal?.buffer.active.viewportY;
+  }
+
+  public restoreKeyboardPosition() {
+    const viewportY = this.viewportYBeforeKeyboard;
+    this.viewportYBeforeKeyboard = undefined;
+    if (viewportY === undefined) return;
+    this.terminal?.scrollToLine(viewportY);
   }
 
   public focus() {
@@ -200,7 +290,7 @@ export class Xterm {
   }
 
   public onTouchSelection(
-    listener?: (box?: TouchSelectionBox) => void
+    listener?: (state: TouchSelectionState) => void
   ) {
     this.touchSelectionListener = listener;
   }
@@ -214,7 +304,7 @@ export class Xterm {
     }
     this.overlayAddon?.showOverlay('\u2702', 300);
     this.touchSelectionText = '';
-    this.touchSelectionListener?.();
+    this.touchSelectionListener?.({status: 'idle'});
   }
 
   private clearListeners() {
@@ -251,12 +341,30 @@ export class Xterm {
     this.reconnectListener = listener;
   }
 
+  public onExit(listener?: () => void) {
+    this.exitListener = listener;
+  }
+
+  public onConnectionStateChange(
+    listener?: (state: ConnectionState) => void
+  ) {
+    this.connectionStateListener = listener;
+    listener?.(this.connectionState);
+  }
+
+  private setConnectionState(state: ConnectionState) {
+    this.connectionState = state;
+    this.connectionStateListener?.(state);
+  }
+
   public reconnectNow() {
+    if (this.exited) return;
     clearTimeout(this.reconnectTimer);
     this.manualReconnectKey?.dispose();
     this.manualReconnectKey = undefined;
     this.reconnectAttempts = 0;
     this.reconnectListener?.(false);
+    this.setConnectionState('connecting');
     this.overlayAddon.showOverlay('Reconnecting...');
     this.refreshToken().then(this.connect);
   }
@@ -304,7 +412,7 @@ export class Xterm {
     } = this;
     window.term = terminal as TtydTerminal;
     window.term.fit = () => {
-      this.fitAddon.fit();
+      this.fit();
     };
 
     terminal.loadAddon(fitAddon);
@@ -340,18 +448,14 @@ export class Xterm {
   private initTouchSelection() {
     if (!this.mobileViewer || !this.terminal.element) return;
     const element = this.terminal.element;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     let startX = 0;
     let startY = 0;
     let currentX = 0;
     let currentY = 0;
     let selecting = false;
+    let armed = false;
     let pointerId: number | undefined;
 
-    const cancel = () => {
-      clearTimeout(timer);
-      timer = undefined;
-    };
     const screenBounds = () =>
       (
         this.terminal.element?.querySelector('.xterm-screen') as
@@ -367,38 +471,44 @@ export class Xterm {
         bounds,
       };
     };
-    const reportBox = (complete: boolean) => {
+    const reportBox = (status: 'selecting' | 'complete') => {
       const start = clampPoint(startX, startY);
       const current = clampPoint(currentX, currentY);
       if (!start || !current) return;
       this.touchSelectionListener?.({
-        left: Math.min(start.x, current.x),
-        top: Math.min(start.y, current.y),
-        width: Math.max(2, Math.abs(current.x - start.x)),
-        height: Math.max(2, Math.abs(current.y - start.y)),
-        complete,
+        status,
+        box: {
+          left: Math.min(start.x, current.x),
+          top: Math.min(start.y, current.y),
+          width: Math.max(2, Math.abs(current.x - start.x)),
+          height: Math.max(2, Math.abs(current.y - start.y)),
+        },
+        copyAvailable:
+          status === 'complete' && Boolean(this.touchSelectionText),
       });
     };
     const pointerDown = (rawEvent: Event) => {
       const event = rawEvent as PointerEvent;
-      if (event.pointerType !== 'touch' || event.button !== 0) return;
+      if (
+        !armed ||
+        event.pointerType !== 'touch' ||
+        event.button !== 0 ||
+        !screenBounds()
+      ) {
+        return;
+      }
+      event.preventDefault();
       startX = event.clientX;
       startY = event.clientY;
       currentX = startX;
       currentY = startY;
       pointerId = event.pointerId;
-      selecting = false;
+      selecting = true;
+      armed = false;
       this.touchSelectionText = '';
-      this.touchSelectionListener?.();
-      cancel();
-      timer = setTimeout(() => {
-        timer = undefined;
-        if (!screenBounds()) return;
-        selecting = true;
-        element.setPointerCapture?.(event.pointerId);
-        reportBox(false);
-        navigator.vibrate?.(15);
-      }, 525);
+      element.setPointerCapture?.(event.pointerId);
+      reportBox('selecting');
+      navigator.vibrate?.(15);
     };
     const pointerMove = (rawEvent: Event) => {
       const event = rawEvent as PointerEvent;
@@ -407,17 +517,12 @@ export class Xterm {
       currentY = event.clientY;
       if (selecting) {
         event.preventDefault();
-        reportBox(false);
-      } else if (
-        Math.hypot(event.clientX - startX, event.clientY - startY) > 12
-      ) {
-        cancel();
+        reportBox('selecting');
       }
     };
     const pointerUp = (rawEvent: Event) => {
       const event = rawEvent as PointerEvent;
       if (event.pointerId !== pointerId) return;
-      cancel();
       if (selecting) {
         currentX = event.clientX;
         currentY = event.clientY;
@@ -427,20 +532,29 @@ export class Xterm {
           currentX,
           currentY,
         );
-        if (this.touchSelectionText) reportBox(true);
-        else this.touchSelectionListener?.();
+        if (this.touchSelectionText) reportBox('complete');
+        else this.touchSelectionListener?.({status: 'idle'});
         element.releasePointerCapture?.(event.pointerId);
       }
       selecting = false;
       pointerId = undefined;
     };
     const pointerCancel = () => {
-      cancel();
+      armed = false;
       selecting = false;
       pointerId = undefined;
       this.touchSelectionText = '';
-      this.touchSelectionListener?.();
+      this.touchSelectionListener?.({status: 'idle'});
     };
+    const arm = () => {
+      selecting = false;
+      pointerId = undefined;
+      armed = true;
+      this.touchSelectionText = '';
+      this.touchSelectionListener?.({status: 'armed'});
+    };
+    this.cancelTouchGesture = pointerCancel;
+    this.armTouchGesture = arm;
 
     this.selectionGestureDisposables.push(
       addEventListener(element, 'pointerdown', pointerDown),
@@ -606,7 +720,7 @@ export class Xterm {
         this.overlayAddon?.showOverlay('\u2702', 200);
       }),
     );
-    register(addEventListener(window, 'resize', () => fitAddon.fit()));
+    register(addEventListener(window, 'resize', () => this.fit()));
     register(addEventListener(window, 'beforeunload', this.onWindowUnload));
   }
 
@@ -659,6 +773,9 @@ export class Xterm {
   @bind
   public connect() {
     if (this.disposed) return;
+    this.setConnectionState(
+      this.reconnectAttempts > 0 ? 'reconnecting' : 'connecting'
+    );
     this.socket = new WebSocket(this.options.wsUrl, ['tty']);
     const { socket, register } = this;
 
@@ -698,6 +815,7 @@ export class Xterm {
     this.manualReconnectKey?.dispose();
     this.manualReconnectKey = undefined;
     this.reconnectListener?.(false);
+    this.setConnectionState('connected');
     this.initListeners();
     this.focus();
   }
@@ -710,12 +828,25 @@ export class Xterm {
     overlayAddon.showOverlay('Connection Closed');
     this.clearListeners();
 
+    if (!this.disposed && connectionStateAfterClose(event.code) === 'exited') {
+      clearTimeout(this.reconnectTimer);
+      this.exited = true;
+      this.doReconnect = false;
+      this.terminal.options.disableStdin = true;
+      this.reconnectListener?.(false);
+      this.setConnectionState('disconnected');
+      this.exitListener?.();
+      overlayAddon.showOverlay('Exited');
+      return;
+    }
+
     if (
       !this.disposed &&
       doReconnect &&
       this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS
     ) {
       this.reconnectAttempts++;
+      this.setConnectionState('reconnecting');
       const delay = reconnectDelay(this.reconnectAttempts);
       overlayAddon.showOverlay(
         `Reconnecting ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`,
@@ -725,8 +856,10 @@ export class Xterm {
         delay,
       );
     } else if (this.closeOnDisconnect) {
+      this.setConnectionState('disconnected');
       window.close();
     } else {
+      this.setConnectionState('disconnected');
       const { terminal } = this;
       this.manualReconnectKey?.dispose();
       this.manualReconnectKey = terminal.onKey((e) => {
@@ -888,7 +1021,7 @@ export class Xterm {
           } else {
             terminal.options[key] = value;
           }
-          if (key.indexOf('font') === 0) fitAddon.fit();
+          if (key.indexOf('font') === 0) this.fit();
           break;
       }
     }

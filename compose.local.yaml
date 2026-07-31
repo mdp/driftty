@@ -1,4 +1,4 @@
-name: ttyd-mobile
+name: driftty
 
 x-gateway-build: &gateway-build
   context: .
@@ -6,7 +6,7 @@ x-gateway-build: &gateway-build
 
 services:
   gateway:
-    image: ttyd-mobile-gateway:local
+    image: driftty-gateway:local
     build: *gateway-build
     volumes:
       - ./config/profiles.yaml:/config/profiles.yaml:ro
@@ -31,9 +31,9 @@ services:
     networks: [terminal]
 
   keygen:
-    image: ttyd-mobile-gateway:local
+    image: driftty-gateway:local
     build: *gateway-build
-    entrypoint: ["/usr/local/bin/ttyd-mobile-keygen"]
+    entrypoint: ["/usr/local/bin/driftty-keygen"]
     volumes:
       - ./keys:/keys
     profiles: [tools]

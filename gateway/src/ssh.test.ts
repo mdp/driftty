@@ -4,8 +4,8 @@ import {sshCommand} from './ssh';
 describe('SSH command', () => {
   test('allows public keys only, persists accepted host keys, and exports the session marker', () => {
     const args = sshCommand({
-      slug: 'baz', label: 'Baz', host: 'baz.example.net', port: 2222,
-      user: 'mark', key: 'baz', keyPath: '/keys/baz',
+      slug: 'baz', host: 'baz.example.net', port: 2222,
+      user: 'mark', keyPath: '/keys/baz',
     }, '/known-hosts/known_hosts');
     expect(args).toContain('BatchMode=yes');
     expect(args).toContain('IdentitiesOnly=yes');
@@ -19,10 +19,11 @@ describe('SSH command', () => {
 
   test('runs an autorun command in the remote login shell', () => {
     const args = sshCommand({
-      slug: 'baz', label: 'Baz', host: 'baz.example.net', port: 22,
-      user: 'mark', key: 'baz', keyPath: '/keys/baz',
+      slug: 'baz', host: 'baz.example.net', port: 22,
+      user: 'mark', keyPath: '/keys/baz',
+    }, '/known-hosts/known_hosts', {
       autorun: "printf '%s\\n' \"$TTYD_SESSION\"; exec tmux new -A -s ttyd",
-    }, '/known-hosts/known_hosts');
+    });
 
     expect(args.at(-1)).toBe(
       `TTYD_SESSION=1; export TTYD_SESSION; exec "\${SHELL:-/bin/sh}" -lc ` +

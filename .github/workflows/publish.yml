@@ -18,9 +18,9 @@ jobs:
       matrix:
         include:
           - target: generic
-            image: ttyd-mobile
+            image: driftty
           - target: gateway
-            image: ttyd-mobile-gateway
+            image: driftty-gateway
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -38,6 +38,6 @@ jobs:
           push: true
           tags: ghcr.io/mdp/${{ matrix.image }}:${{ inputs.tag }}
           labels: |
-            org.opencontainers.image.source=https://github.com/mdp/ttyd-mobile
+            org.opencontainers.image.source=https://github.com/mdp/driftty
             org.opencontainers.image.version=${{ inputs.tag }}
             org.opencontainers.image.licenses=MIT

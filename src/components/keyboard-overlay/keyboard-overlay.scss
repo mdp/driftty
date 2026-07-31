@@ -72,17 +72,6 @@ $cut: 8px;
     white-space: nowrap;
   }
 
-  &__signal {
-    width: 5px;
-    height: 5px;
-    background: $green;
-    border-radius: 50%;
-    box-shadow:
-      0 0 5px $green,
-      0 0 10px rgba($green, 0.6);
-    animation: signal-pulse 1.8s ease-in-out infinite;
-  }
-
   &__status-section {
     min-width: 0;
     margin-right: auto;
@@ -100,21 +89,6 @@ $cut: 8px;
 
     &::-webkit-scrollbar {
       display: none;
-    }
-  }
-
-  &__setting {
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 5px;
-    color: $muted;
-    font: 700 9px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-
-    input {
-      accent-color: $cyan;
     }
   }
 
@@ -185,24 +159,8 @@ $cut: 8px;
       }
     }
 
-    &--composer {
-      color: $magenta;
-      filter: drop-shadow(0 0 4px rgba($magenta, 0.55));
-    }
-  }
-
-  &__microphone {
-    width: 19px;
-    height: 19px;
-    overflow: visible;
-    vertical-align: middle;
-    fill: currentColor;
-
-    path {
-      fill: none;
-      stroke: currentColor;
-      stroke-width: 1.8;
-      stroke-linecap: round;
+    &--close {
+      color: $danger;
     }
   }
 
@@ -430,41 +388,97 @@ $cut: 8px;
 
 .keyboard-toggle {
   position: absolute;
-  right: max(12px, env(safe-area-inset-right));
-  bottom: max(12px, env(safe-area-inset-bottom));
+  top: max(0px, env(safe-area-inset-top));
+  right: max(0px, env(safe-area-inset-right));
   z-index: 1001;
-  width: 54px;
-  height: 48px;
+  display: grid;
+  width: 26px;
+  height: 24px;
   padding: 0;
+  overflow: hidden;
   color: $cyan;
-  background: linear-gradient(135deg, rgba(15, 33, 39, 0.94), rgba(5, 9, 12, 0.96));
+  background: transparent;
   border: 0;
-  box-shadow:
-    inset 0 0 0 1px rgba($cyan, 0.62),
-    0 0 18px rgba(0, 0, 0, 0.72);
+  box-shadow: none;
   cursor: pointer;
-  @include cut-corners(10px);
+  opacity: 0.78;
+  transition:
+    width 140ms ease,
+    height 140ms ease,
+    background 140ms ease,
+    opacity 140ms ease,
+    box-shadow 140ms ease;
+
+  &::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 24px;
+    height: 24px;
+    content: '';
+    background: linear-gradient(135deg, rgba($cyan, 0.92), rgba($cyan, 0.58));
+    clip-path: polygon(100% 0, 100% 100%, 0 0);
+    filter: drop-shadow(-3px 3px 7px rgba($cyan, 0.28));
+    transform: scale(1);
+    transform-origin: 100% 0;
+    transition:
+      opacity 100ms ease,
+      transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  &:hover,
+  &:focus-visible {
+    width: 52px;
+    height: 42px;
+    opacity: 1;
+    background: linear-gradient(135deg, rgba(15, 33, 39, 0.96), rgba(5, 9, 12, 0.98));
+    box-shadow:
+      inset 0 0 0 1px rgba($cyan, 0.72),
+      0 3px 14px rgba(0, 0, 0, 0.68),
+      0 0 10px rgba($cyan, 0.2);
+  }
+
+  &:hover::before,
+  &:focus-visible::before {
+    opacity: 0.18;
+    transform: scale(0.72);
+  }
 
   &:focus-visible {
     outline: 2px solid $cyan;
-    outline-offset: 3px;
+    outline-offset: -3px;
   }
 
   &__signal {
-    position: absolute;
-    top: 7px;
-    right: 7px;
-    width: 4px;
-    height: 4px;
-    background: $green;
-    border-radius: 50%;
-    box-shadow: 0 0 6px $green;
+    display: none;
   }
 
   &__prompt {
-    font: 800 18px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    place-self: center;
+    display: grid;
+    place-items: center;
+    width: 27px;
+    height: 22px;
+    font: 800 12px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
     letter-spacing: -0.08em;
+    background: rgba(4, 11, 14, 0.92);
+    border: 1px solid rgba($cyan, 0.8);
+    box-shadow:
+      inset 0 0 7px rgba($cyan, 0.08),
+      0 0 8px rgba($cyan, 0.18);
     text-shadow: 0 0 7px rgba($cyan, 0.7);
+    opacity: 0;
+    transform: translate(11px, -8px) rotate(-90deg) scale(0.32);
+    transform-origin: 100% 0;
+    transition:
+      opacity 90ms ease,
+      transform 180ms cubic-bezier(0.2, 0.85, 0.2, 1);
+  }
+
+  &:hover &__prompt,
+  &:focus-visible &__prompt {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg) scale(1);
   }
 }
 
@@ -478,16 +492,6 @@ $cut: 8px;
     opacity: 1;
     clip-path: inset(0 0 0 0);
     transform: translateY(0);
-  }
-}
-
-@keyframes signal-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
   }
 }
 
@@ -527,6 +531,31 @@ $cut: 8px;
 
     &__special-keys .keyboard-overlay__button {
       height: 30px;
+    }
+  }
+}
+
+@media (min-width: 720px) {
+  .keyboard-overlay {
+    left: 50%;
+    right: auto;
+    width: min(720px, 100%);
+    box-sizing: border-box;
+    border-right: 1px solid rgba($cyan, 0.25);
+    border-left: 1px solid rgba($cyan, 0.25);
+    transform: translateX(-50%);
+  }
+
+  @keyframes terminal-deploy {
+    from {
+      opacity: 0;
+      clip-path: inset(100% 0 0 0);
+      transform: translate(-50%, 12px);
+    }
+    to {
+      opacity: 1;
+      clip-path: inset(0 0 0 0);
+      transform: translate(-50%, 0);
     }
   }
 }

@@ -1,0 +1,97 @@
+import {afterEach, describe, expect, it, vi} from 'vitest';
+import {Xterm, type TouchSelectionStatus, type XtermOptions} from '.';
+
+vi.hoisted(() => {
+  Object.assign(globalThis, {self: globalThis});
+});
+
+function touchEvent(type: string, pointerId = 1): Event {
+  return Object.assign(new Event(type, {cancelable: true}), {
+    button: 0,
+    clientX: 20,
+    clientY: 30,
+    pointerId,
+    pointerType: 'touch',
+  });
+}
+
+function mobileOptions(): XtermOptions {
+  return {
+    wsUrl: '',
+    tokenUrl: '',
+    flowControl: {limit: 1, highWater: 1, lowWater: 0},
+    clientOptions: {
+      rendererType: 'dom',
+      disableLeaveAlert: true,
+      disableResizeOverlay: true,
+      enableSixel: false,
+      isWindows: false,
+      unicodeVersion: '11',
+      closeOnDisconnect: false,
+      autoReconnect: false,
+    },
+    termOptions: {},
+    viewer: {
+      formFactor: 'mobile',
+      os: 'other',
+      touch: true,
+      finePointer: false,
+    },
+  };
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('mobile touch selection', () => {
+  it('starts the next touch drag immediately only after being armed', () => {
+    vi.stubGlobal('navigator', {vibrate: vi.fn()});
+    vi.stubGlobal('document', {
+      createElement: () =>
+        Object.assign(new EventTarget(), {
+          style: {},
+        }),
+    });
+    const element = new EventTarget() as EventTarget & {
+      querySelector: () => {getBoundingClientRect: () => DOMRect};
+      setPointerCapture: (pointerId: number) => void;
+    };
+    element.querySelector = () => ({
+      getBoundingClientRect: () =>
+        ({
+          left: 0,
+          right: 320,
+          top: 0,
+          bottom: 240,
+        }) as DOMRect,
+    });
+    element.setPointerCapture = vi.fn();
+
+    const xterm = new Xterm(mobileOptions());
+    (
+      xterm as unknown as {
+        terminal: {
+          element: typeof element;
+          cols: number;
+          rows: number;
+        };
+        initTouchSelection: () => void;
+      }
+    ).terminal = {element, cols: 80, rows: 24};
+    (
+      xterm as unknown as {initTouchSelection: () => void}
+    ).initTouchSelection();
+
+    const statuses: TouchSelectionStatus[] = [];
+    xterm.onTouchSelection(({status}) => statuses.push(status));
+
+    element.dispatchEvent(touchEvent('pointerdown'));
+    expect(statuses).toEqual([]);
+
+    xterm.armTouchSelection();
+    element.dispatchEvent(touchEvent('pointerdown'));
+
+    expect(statuses).toEqual(['armed', 'selecting']);
+    expect(element.setPointerCapture).toHaveBeenCalledWith(1);
+    xterm.dispose();
+  });
+});

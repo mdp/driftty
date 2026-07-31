@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@ttyd-mobile/gateway",
+      "name": "@driftty/gateway",
       "dependencies": {
         "yaml": "2.8.2",
       },

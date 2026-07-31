@@ -19,7 +19,6 @@ interface Props {
   terminal: Xterm;
   show: boolean;
   onToggle: () => void;
-  onOpenComposer: () => void;
   onHeightChange: (height: number) => void;
 }
 
@@ -29,27 +28,29 @@ type KeyboardLayer = 'letters' | 'symbols';
 interface State {
   modifier?: InputModifier;
   section: Section;
-  autoReconnect: boolean;
   layer: KeyboardLayer;
 }
 
 export class KeyboardOverlay extends Component<Props, State> {
   private resizeObserver?: ResizeObserver;
   private handledTouchPress = false;
+  private activeModifier?: InputModifier;
 
   constructor(props: Props) {
     super(props);
     this.state = {
       section: 'agent',
-      autoReconnect: props.terminal.isAutoReconnectEnabled(),
       layer: 'letters',
     };
   }
 
   componentDidMount() {
-    this.props.terminal.onInputModifierChange((modifier) =>
-      this.setState({modifier})
-    );
+    this.props.terminal.onInputModifierChange((modifier) => {
+      // Keep an immediate copy for rapid key presses. Preact state updates can
+      // land after the next pointer event (notably Shift followed by Enter).
+      this.activeModifier = modifier;
+      this.setState({modifier});
+    });
   }
 
   componentWillUnmount() {
@@ -79,7 +80,7 @@ export class KeyboardOverlay extends Component<Props, State> {
   };
 
   private typeCharacter = (value: string) => {
-    const {modifier} = this.state;
+    const modifier = this.activeModifier;
     this.sendKey(modifier ? applyInputModifier(value, modifier) : value);
     if (modifier) this.props.terminal.clearInputModifier();
   };
@@ -93,7 +94,7 @@ export class KeyboardOverlay extends Component<Props, State> {
   };
 
   private toggleModifier = (modifier: InputModifier) => {
-    if (this.state.modifier === modifier) {
+    if (this.activeModifier === modifier) {
       this.props.terminal.clearInputModifier();
     } else {
       this.props.terminal.armInputModifier(modifier);
@@ -108,12 +109,6 @@ export class KeyboardOverlay extends Component<Props, State> {
   private exitTmuxScroll = () => {
     this.sendKey(sequences.tmuxScrollExit);
     this.setState({section: 'tmux'});
-  };
-
-  private toggleAutoReconnect = () => {
-    const autoReconnect = !this.state.autoReconnect;
-    this.props.terminal.setAutoReconnect(autoReconnect);
-    this.setState({autoReconnect});
   };
 
   private renderKey = (key: ToolbarKey) => (
@@ -344,26 +339,19 @@ export class KeyboardOverlay extends Component<Props, State> {
         onPointerDown={(event) => event.preventDefault()}
       >
         <div class="keyboard-overlay__status">
-          <span class="keyboard-overlay__signal" aria-hidden="true" />
-          <span>TTYD//REMOTE</span>
+          <span>Full keyboard</span>
           <span class="keyboard-overlay__status-section">
-            {this.state.section.replace('-', '_')}
+            {this.state.section.replace('-', ' ')}
           </span>
-          <label class="keyboard-overlay__setting">
-            <input
-              type="checkbox"
-              checked={this.state.autoReconnect}
-              onChange={this.toggleAutoReconnect}
-            />
-            Auto reconnect
-          </label>
         </div>
         <div class="keyboard-overlay__rail">
           {sections.map(({id, label}) => (
             <button
               key={id}
               class={`keyboard-overlay__tab ${
-                this.state.section === id ? 'keyboard-overlay__tab--active' : ''
+                this.state.section === id
+                  ? 'keyboard-overlay__tab--active'
+                  : ''
               }`}
               onClick={() => this.setState({section: id})}
             >
@@ -371,27 +359,12 @@ export class KeyboardOverlay extends Component<Props, State> {
             </button>
           ))}
           <button
-            class="keyboard-overlay__tab keyboard-overlay__tab--composer"
-            onClick={this.props.onOpenComposer}
-            title="Open Input and Paste"
-            aria-label="Open Input and Paste"
-          >
-            <svg
-              class="keyboard-overlay__microphone"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <rect x="9" y="3" width="6" height="11" rx="3" />
-              <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M9 21h6" />
-            </svg>
-          </button>
-          <button
-            class="keyboard-overlay__tab"
+            class="keyboard-overlay__tab keyboard-overlay__tab--close"
             onClick={this.props.onToggle}
             title="Close keyboard"
             aria-label="Close keyboard"
           >
-            ⌄
+            Close
           </button>
         </div>
         <div class="keyboard-overlay__keyboard">

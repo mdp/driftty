@@ -1,8 +1,17 @@
 profiles:
   - slug: baz
     label: Baz server
+    host_label: Baz
     host: baz.example.net
     port: 22
     user: mark
     key: baz
-    # autorun: tmux new-session -A -s ttyd
+    sessions:
+      - name: mdp
+        label: MDP terminal
+        directory: /home/mark
+    new_sessions:
+      enabled: true
+      directory: /home/mark
+      prefix: ttyd-
+      # max: 20

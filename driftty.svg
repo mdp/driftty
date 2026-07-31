@@ -1,0 +1,41 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 64 64"
+  role="img"
+  aria-labelledby="title"
+>
+  <title id="title">driftty ship logo</title>
+
+  <g
+    fill="none"
+    stroke="#39e7ff"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <!-- Mast -->
+    <path d="M32 9v38" />
+
+    <!-- Pennant -->
+    <path
+      d="M32 10 22 14l10 4z"
+      fill="#39e7ff"
+      stroke="none"
+    />
+
+    <!-- Upper sails -->
+    <path d="M22 22h20" />
+    <path d="M24 22c1 5 7 7 8 0M32 22c1 5 7 7 8 0" />
+
+    <!-- Lower sails -->
+    <path d="M16 31h32" />
+    <path d="M18 31c2 6 11 8 14 0M32 31c3 8 12 6 14 0" />
+
+    <!-- Hull -->
+    <path d="M14 44 32 36l18 8c-2 10-9 15-18 15S16 54 14 44z" />
+    <path d="M14 44 32 36l18 8" />
+
+    <!-- Water -->
+    <path d="M9 57h7M48 57h7" />
+  </g>
+</svg>

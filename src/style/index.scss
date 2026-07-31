@@ -40,20 +40,48 @@ body {
   }
 }
 
+.terminal-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 #terminal-container {
   width: auto;
   height: 100%;
   margin: 0 auto;
   padding: 0;
   .terminal {
-    padding: 5px;
-    height: calc(100% - 10px);
+    height: 100%;
+    padding: 0;
   }
 
   .xterm-viewport {
     scrollbar-color: rgba(89, 243, 255, 0.32) rgba(5, 8, 11, 0.6);
     scrollbar-width: thin;
   }
+}
+
+.terminal-viewport {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+
+  &--fixed {
+    touch-action: none;
+  }
+}
+
+.terminal-surface {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  transform-origin: 0 0;
+  will-change: transform;
 }
 
 .reconnect-button {
@@ -73,6 +101,65 @@ body {
   clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
 }
 
+.terminal-exited {
+  position: absolute;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 8, 11, 0.9);
+  backdrop-filter: blur(6px);
+
+  &__panel {
+    width: min(420px, 100%);
+    padding: 34px 28px;
+    text-align: center;
+    background: #081116;
+    border: 1px solid #ff59d6;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+    clip-path: polygon(
+      0 0,
+      calc(100% - 14px) 0,
+      100% 14px,
+      100% 100%,
+      14px 100%,
+      0 calc(100% - 14px)
+    );
+  }
+
+  &__signal {
+    color: #ff59d6;
+    font-size: 18px;
+  }
+
+  h1 {
+    margin: 12px 0 8px;
+    color: #f4fffb;
+    font: 800 clamp(2rem, 10vw, 3.5rem)/1 ui-monospace, 'SFMono-Regular',
+      Menlo, monospace;
+    letter-spacing: -0.06em;
+    text-transform: uppercase;
+  }
+
+  p {
+    margin: 0 0 24px;
+    color: #8da9a3;
+    font: 13px/1.6 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  }
+
+  a {
+    display: inline-block;
+    padding: 12px 18px;
+    color: #05080b;
+    background: #73f7ff;
+    font: 800 12px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    letter-spacing: 0.08em;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+}
+
 .terminal-touch-selection {
   position: fixed;
   z-index: 1450;
@@ -87,6 +174,36 @@ body {
 
   &--complete {
     border-style: solid;
+    cursor: move;
+    pointer-events: auto;
+    touch-action: none;
+  }
+}
+
+.terminal-selection-handle {
+  position: absolute;
+  z-index: 1501;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: #59f3ff;
+  border: 3px solid rgba(5, 8, 11, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 2px 9px rgba(0, 0, 0, 0.5);
+  touch-action: none;
+
+  &--top-left {
+    top: 0;
+    left: 0;
+    cursor: nwse-resize;
+    transform: translate(-50%, -50%);
+  }
+
+  &--bottom-right {
+    right: 0;
+    bottom: 0;
+    cursor: nwse-resize;
+    transform: translate(50%, 50%);
   }
 }
 
@@ -106,6 +223,10 @@ body {
   pointer-events: auto;
   transform: translate(-50%, -100%);
   touch-action: manipulation;
+
+  &:disabled {
+    opacity: 0.5;
+  }
 
   &::after {
     position: absolute;

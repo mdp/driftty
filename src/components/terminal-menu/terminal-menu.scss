@@ -1,0 +1,363 @@
+$void: #05080b;
+$cyan: #59f3ff;
+$green: #76ffb5;
+$magenta: #ff56d8;
+$muted: #66858c;
+
+.terminal-menu {
+  position: absolute;
+  top: max(34px, calc(env(safe-area-inset-top) + 34px));
+  right: max(8px, env(safe-area-inset-right));
+  z-index: 1250;
+  width: clamp(280px, 24vw, 360px);
+  max-height: calc(100vh - max(50px, env(safe-area-inset-top)));
+  box-sizing: border-box;
+  padding: 12px;
+  color: #d9eeee;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 3px,
+      rgba(0, 0, 0, 0.14) 4px
+    ),
+    linear-gradient(145deg, rgba(12, 27, 34, 0.99), rgba($void, 0.99));
+  border: 1px solid rgba($cyan, 0.62);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.78),
+    0 0 22px rgba($cyan, 0.1);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  clip-path: polygon(
+    9px 0,
+    100% 0,
+    100% calc(100% - 9px),
+    calc(100% - 9px) 100%,
+    0 100%,
+    0 9px
+  );
+  animation: terminal-menu-deploy 140ms ease-out;
+  overflow-y: auto;
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 2px 11px;
+    border-bottom: 1px solid rgba($cyan, 0.18);
+
+    strong,
+    small {
+      display: block;
+    }
+
+    strong {
+      color: $cyan;
+      font-size: 13px;
+    }
+
+    small {
+      margin-top: 6px;
+      color: $muted;
+      font-size: 10px;
+    }
+
+    [data-state='connected'] {
+      color: $green;
+    }
+
+    [data-state='reconnecting'] {
+      color: #ffd166;
+    }
+
+    [data-state='disconnected'] {
+      color: #ff5d7d;
+    }
+  }
+
+  &__close {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    color: $muted;
+    background: transparent;
+    border: 0;
+    font: 20px/1 ui-monospace, monospace;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      color: $cyan;
+    }
+  }
+
+  &__primary,
+  &__section {
+    display: grid;
+    gap: 6px;
+  }
+
+  &__primary {
+    padding: 10px 0;
+  }
+
+  &__section {
+    padding-top: 9px;
+    border-top: 1px solid rgba($cyan, 0.13);
+
+    & + & {
+      margin-top: 10px;
+    }
+
+    h2 {
+      margin: 0 2px 2px;
+      color: $muted;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+  }
+
+  a,
+  button:not(.terminal-menu__close),
+  label {
+    display: flex;
+    min-height: 42px;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 11px;
+    color: #d9eeee;
+    background: linear-gradient(
+      180deg,
+      rgba(24, 43, 49, 0.92),
+      rgba(8, 15, 19, 0.96)
+    );
+    border: 1px solid rgba($cyan, 0.2);
+    font: 700 11px/1.2 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    text-align: left;
+    text-decoration: none;
+  }
+
+  a,
+  button:not(.terminal-menu__close) {
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      color: $cyan;
+      border-color: rgba($cyan, 0.7);
+      outline: 0;
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.5;
+    }
+  }
+
+  label {
+    cursor: pointer;
+  }
+
+  input {
+    width: 19px;
+    height: 19px;
+    margin: 0;
+    accent-color: $cyan;
+  }
+
+  &__state {
+    color: $muted;
+    font-size: 9px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  &__size {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    legend {
+      width: 100%;
+      margin-bottom: 5px;
+      color: $muted;
+      font-size: 10px;
+    }
+
+    label {
+      strong,
+      small {
+        display: block;
+      }
+
+      strong {
+        color: inherit;
+        font-size: 11px;
+      }
+
+      small {
+        margin-top: 3px;
+        color: $muted;
+        font-size: 9px;
+        font-weight: 500;
+      }
+    }
+
+    p {
+      margin: 1px 2px 6px;
+      color: $muted;
+      font-size: 9px;
+      line-height: 1.45;
+    }
+  }
+
+  &__custom-size {
+    display: grid;
+    grid-template-columns: minmax(72px, 1fr) 70px auto 70px auto;
+    align-items: end;
+    gap: 5px;
+
+    > span:first-child {
+      align-self: center;
+
+      strong,
+      small {
+        display: block;
+      }
+
+      small {
+        margin-top: 3px;
+        color: $muted;
+        font-size: 9px;
+      }
+    }
+
+    label {
+      display: grid;
+      min-height: 0;
+      gap: 3px;
+      padding: 0;
+      background: none;
+      border: 0;
+      font-size: 8px;
+    }
+
+    input[type='number'] {
+      width: 100%;
+      height: 44px;
+      box-sizing: border-box;
+      padding: 4px;
+      color: #d9eeee;
+      background: rgba(5, 8, 11, 0.85);
+      border: 1px solid rgba($cyan, 0.3);
+      font: 700 11px/1 ui-monospace, monospace;
+    }
+
+    button {
+      min-height: 44px !important;
+      padding: 5px 8px !important;
+    }
+  }
+
+}
+
+.terminal-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 1240;
+  background: rgba(0, 0, 0, 0.48);
+}
+
+.terminal-menu__key-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+
+  button {
+    min-width: 0;
+    min-height: 44px;
+    padding: 7px 4px;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .terminal-menu__wide {
+    grid-column: 1 / -1;
+  }
+
+  .terminal-menu__armed {
+    color: #ffd166;
+    border-color: rgba(#ffd166, 0.7);
+  }
+
+  .terminal-menu__interrupt {
+    color: #ff879d;
+    border-color: rgba(#ff5d7d, 0.5);
+  }
+
+  .terminal-menu__keyboard {
+    color: $cyan;
+
+    svg {
+      width: 22px;
+      height: 22px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.6;
+    }
+  }
+}
+
+@media (max-width: 720px), (hover: none) and (pointer: coarse) {
+  .terminal-menu-backdrop .terminal-menu {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: min(82vh, 680px);
+    padding:
+      12px max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%, 0 10px);
+    animation-name: terminal-menu-sheet;
+  }
+
+  .terminal-menu a,
+  .terminal-menu button:not(.terminal-menu__close),
+  .terminal-menu label {
+    min-height: 44px;
+  }
+}
+
+@keyframes terminal-menu-deploy {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    transform-origin: top right;
+  }
+}
+
+@keyframes terminal-menu-sheet {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .terminal-menu {
+    animation: none;
+  }
+}
