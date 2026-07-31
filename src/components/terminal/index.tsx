@@ -30,6 +30,12 @@ import {
   adjustTouchSelectionBox,
   type TouchSelectionAdjustment,
 } from './touch-selection-box';
+import {
+  TerminalUiController,
+  type TerminalUiAction,
+  type TerminalUiState,
+  type TerminalSurface,
+} from './ui-state';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -38,17 +44,14 @@ interface Props extends XtermOptions {
 }
 
 interface State {
-  showKeyboard: boolean;
-  softwareKeyboardOpen: boolean;
+  ui: TerminalUiState;
   viewportHeight: number;
   viewportOffsetTop: number;
-  showComposer: boolean;
   composerValue: string;
   reconnectRequired: boolean;
   exited: boolean;
   connectionState: ConnectionState;
   autoReconnect: boolean;
-  showTerminalMenu: boolean;
   webKeyboardHeight: number;
   quickbarHeight: number;
   scrollControls: boolean;
@@ -62,8 +65,10 @@ export class Terminal extends Component<Props, State> {
   private viewport?: HTMLElement;
   private xterm: Xterm;
   private fixedMobileViewport: FixedMobileViewport;
+  private uiController = new TerminalUiController();
   private layoutHeight = window.innerHeight;
   private layoutWidth = window.innerWidth;
+  private quickbarLayoutReady = false;
   private readonly mobileViewer: boolean;
   private ctrlTimer?: number;
   private selectionAdjustment?: {
@@ -87,11 +92,9 @@ export class Terminal extends Component<Props, State> {
       onChange: (fixedViewport) => this.setState({fixedViewport}),
     });
     this.state = {
-      showKeyboard: false,
-      softwareKeyboardOpen: false,
+      ui: this.uiController.state,
       viewportHeight: window.visualViewport?.height ?? window.innerHeight,
       viewportOffsetTop: window.visualViewport?.offsetTop ?? 0,
-      showComposer: false,
       composerValue: loadComposerDraft(
         window.sessionStorage,
         window.location.pathname
@@ -100,7 +103,6 @@ export class Terminal extends Component<Props, State> {
       exited: false,
       connectionState: 'connecting',
       autoReconnect: this.xterm.isAutoReconnectEnabled(),
-      showTerminalMenu: false,
       webKeyboardHeight: 0,
       quickbarHeight: 0,
       scrollControls: false,
@@ -162,16 +164,14 @@ export class Terminal extends Component<Props, State> {
   render(
     {id}: Props,
     {
-      showKeyboard,
+      ui,
       viewportHeight,
       viewportOffsetTop,
-      showComposer,
       composerValue,
       reconnectRequired,
       exited,
       connectionState,
       autoReconnect,
-      showTerminalMenu,
       webKeyboardHeight,
       quickbarHeight,
       scrollControls,
@@ -181,6 +181,9 @@ export class Terminal extends Component<Props, State> {
     }: State
   ) {
     const {size: terminalViewportSize, surface, transform} = fixedViewport;
+    const showKeyboard = ui.surface === 'web-keyboard';
+    const showComposer = ui.surface === 'composer';
+    const showTerminalMenu = ui.surface === 'menu';
     return (
       <div
         class="terminal-shell"
@@ -237,7 +240,7 @@ export class Terminal extends Component<Props, State> {
         </div>
         <KeyboardOverlay
           terminal={this.xterm}
-          show={showKeyboard && !showComposer}
+          show={showKeyboard}
           onToggle={this.toggleKeyboard}
           onHeightChange={this.handleWebKeyboardHeight}
         />
@@ -349,9 +352,7 @@ export class Terminal extends Component<Props, State> {
           />
         )}
         {this.mobileViewer &&
-          !showComposer &&
-          !showKeyboard &&
-          !showTerminalMenu && (
+          ui.surface === 'terminal' && (
             <TerminalQuickbar
               ctrlArmed={ctrlArmed}
               draftAvailable={Boolean(composerValue)}
@@ -393,17 +394,20 @@ export class Terminal extends Component<Props, State> {
 
   @bind
   toggleKeyboard() {
-    const showKeyboard = !this.state.showKeyboard;
-    this.xterm.setWebKeyboardActive(showKeyboard);
-    this.setState({showKeyboard});
+    if (this.uiController.state.surface === 'web-keyboard') {
+      this.xterm.setWebKeyboardActive(false);
+      this.returnToTerminal();
+      return;
+    }
+    this.openKeyboard();
   }
 
   @bind
   openKeyboard() {
-    if (this.state.showKeyboard) return;
+    if (this.uiController.state.surface === 'web-keyboard') return;
     this.xterm.setWebKeyboardActive(true);
     this.clearCtrl();
-    this.setState({showKeyboard: true, showTerminalMenu: false});
+    this.showSurface('web-keyboard');
   }
 
   private handleWebKeyboardHeight = (webKeyboardHeight: number) => {
@@ -411,8 +415,10 @@ export class Terminal extends Component<Props, State> {
     this.setState({webKeyboardHeight}, () =>
       requestAnimationFrame(() => {
         this.xterm.fit();
-        this.xterm.scrollToBottom();
-        this.fixedMobileViewport.anchorBottom();
+        if (webKeyboardHeight > 0) {
+          this.xterm.scrollToBottom();
+          this.fixedMobileViewport.anchorBottom();
+        }
       })
     );
   };
@@ -489,21 +495,13 @@ export class Terminal extends Component<Props, State> {
 
   @bind
   openComposer() {
-    if (this.mobileViewer) {
-      this.xterm.captureKeyboardPosition();
-      this.fixedMobileViewport.captureKeyboardPosition();
-    }
     this.xterm.setWebKeyboardActive(false);
-    this.setState({
-      showComposer: true,
-      showKeyboard: false,
-      showTerminalMenu: false,
-    });
+    this.showSurface('composer');
   }
 
   @bind
   closeComposer() {
-    this.setState({showComposer: false}, () => {
+    this.returnToTerminal(() => {
       if (!this.mobileViewer) this.xterm.focus();
     });
   }
@@ -528,35 +526,32 @@ export class Terminal extends Component<Props, State> {
     }
     saveComposerDraft(window.sessionStorage, window.location.pathname, '');
     this.clearCtrl();
-    this.setState({showComposer: false, composerValue: ''}, () => {
+    this.returnToTerminal(() => {
+      this.setState({composerValue: ''});
       if (!this.mobileViewer) this.xterm.focus();
     });
   }
 
   @bind
   toggleTerminalMenu() {
-    if (this.state.showTerminalMenu) {
+    if (this.uiController.state.surface === 'menu') {
       this.closeTerminalMenu();
       return;
     }
     this.xterm.setWebKeyboardActive(false);
-    this.setState({showTerminalMenu: true});
+    this.showSurface('menu');
   }
 
   @bind
   openTerminalMenu() {
     this.xterm.setWebKeyboardActive(false);
-    this.setState({
-      showTerminalMenu: true,
-      showComposer: false,
-      showKeyboard: false,
-    });
+    this.showSurface('menu');
   }
 
   @bind
   closeTerminalMenu() {
     this.clearCtrl();
-    this.setState({showTerminalMenu: false}, () => {
+    this.returnToTerminal(() => {
       if (!this.mobileViewer) this.xterm.focus();
     });
   }
@@ -615,11 +610,18 @@ export class Terminal extends Component<Props, State> {
 
   private handleQuickbarHeight = (quickbarHeight: number) => {
     if (quickbarHeight === this.state.quickbarHeight) return;
+    if (quickbarHeight === 0) this.quickbarLayoutReady = false;
     this.setState({quickbarHeight}, () =>
       requestAnimationFrame(() => {
         this.xterm.fit();
-        this.xterm.scrollToBottom();
-        this.fixedMobileViewport.anchorBottom();
+        if (this.uiController.state.positionCheckpoint === 'none') {
+          this.xterm.scrollToBottom();
+          this.fixedMobileViewport.anchorBottom();
+        }
+        if (quickbarHeight > 0) {
+          this.quickbarLayoutReady = true;
+          this.settleTerminalLayout();
+        }
       })
     );
   };
@@ -659,13 +661,16 @@ export class Terminal extends Component<Props, State> {
     }
 
     if (!viewport) {
+      this.updateSoftwareKeyboard(false);
       this.setState(
         {
           viewportHeight: window.innerHeight,
           viewportOffsetTop: 0,
-          softwareKeyboardOpen: false,
         },
-        () => this.xterm.fit()
+        () => {
+          this.xterm.fit();
+          this.settleTerminalLayout();
+        }
       );
       return;
     }
@@ -681,20 +686,18 @@ export class Terminal extends Component<Props, State> {
       viewport.scale
     );
     const keyboardJustOpened =
-      measurement.keyboardOpen && !this.state.softwareKeyboardOpen;
+      measurement.keyboardOpen &&
+      !this.uiController.state.softwareKeyboardOpen;
     const keyboardChanged =
-      measurement.keyboardOpen !== this.state.softwareKeyboardOpen;
-    if (keyboardJustOpened) {
-      this.xterm.captureKeyboardPosition();
-      this.fixedMobileViewport.captureKeyboardPosition();
-    }
+      measurement.keyboardOpen !==
+      this.uiController.state.softwareKeyboardOpen;
+    if (keyboardChanged) this.updateSoftwareKeyboard(measurement.keyboardOpen);
+    if (keyboardJustOpened) this.xterm.setWebKeyboardActive(false);
 
     this.setState(
       {
         viewportHeight: measurement.height,
         viewportOffsetTop: measurement.offsetTop,
-        softwareKeyboardOpen: measurement.keyboardOpen,
-        showKeyboard: keyboardJustOpened ? false : this.state.showKeyboard,
       },
       () => {
         requestAnimationFrame(() => {
@@ -704,12 +707,51 @@ export class Terminal extends Component<Props, State> {
               this.xterm.scrollToBottom();
               this.fixedMobileViewport.anchorBottom();
             } else {
-              this.xterm.restoreKeyboardPosition();
-              this.fixedMobileViewport.restoreKeyboardPosition();
+              this.settleTerminalLayout();
             }
           }
         });
       }
     );
   };
+
+  private showSurface(surface: Exclude<TerminalSurface, 'terminal'>) {
+    this.transitionUi({
+      type: 'show-surface',
+      surface,
+      preservePosition: this.mobileViewer,
+    });
+  }
+
+  private returnToTerminal(callback?: () => void) {
+    this.transitionUi({type: 'return-to-terminal'}, callback);
+  }
+
+  private updateSoftwareKeyboard(open: boolean) {
+    this.transitionUi({
+      type: 'software-keyboard',
+      open,
+      preservePosition: this.mobileViewer,
+    });
+  }
+
+  private settleTerminalLayout() {
+    if (this.mobileViewer && !this.quickbarLayoutReady) return;
+    this.transitionUi({type: 'layout-settled'});
+  }
+
+  private transitionUi(action: TerminalUiAction, callback?: () => void) {
+    const effect = this.uiController.transition(action);
+    if (effect === 'capture-position') {
+      this.xterm.captureKeyboardPosition();
+      this.fixedMobileViewport.captureKeyboardPosition();
+    }
+    this.setState({ui: this.uiController.state}, () => {
+      if (effect === 'restore-position') {
+        this.xterm.restoreKeyboardPosition();
+        this.fixedMobileViewport.restoreKeyboardPosition();
+      }
+      callback?.();
+    });
+  }
 }

@@ -346,10 +346,52 @@ export class TerminalMenu extends Component<Props> {
   };
 
   private handleKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== 'Escape') return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.props.onClose();
+      return;
+    }
+    if (event.key !== 'Tab' || !this.props.mobile || !this.menu) return;
+    const target = mobileMenuFocusTarget(
+      focusableMenuControls(this.menu),
+      document.activeElement,
+      event.shiftKey,
+    );
+    if (!target) return;
     event.preventDefault();
-    this.props.onClose();
+    target.focus();
   };
+}
+
+const menuFocusableSelector = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+function focusableMenuControls(menu: HTMLElement): HTMLElement[] {
+  return Array.from(menu.querySelectorAll<HTMLElement>(menuFocusableSelector));
+}
+
+export function mobileMenuFocusTarget(
+  controls: readonly HTMLElement[],
+  activeElement: Element | null,
+  backwards: boolean,
+): HTMLElement | undefined {
+  const first = controls[0];
+  const last = controls[controls.length - 1];
+  if (!first || !last) return undefined;
+  const focusIsOutside = !controls.includes(activeElement as HTMLElement);
+  if (backwards && (activeElement === first || focusIsOutside)) {
+    return last;
+  }
+  if (!backwards && (activeElement === last || focusIsOutside)) {
+    return first;
+  }
+  return undefined;
 }
 
 function MenuKeys({
