@@ -10,10 +10,10 @@ export function measureVisualViewport(
   offsetTop: number,
   scale: number
 ): ViewportMeasurement {
-  const obscuredHeight = layoutHeight - visualHeight - offsetTop;
+  const reducedHeight = layoutHeight - visualHeight;
   return {
     height: visualHeight,
     offsetTop,
-    keyboardOpen: scale <= 1.05 && obscuredHeight > 150,
+    keyboardOpen: scale <= 1.05 && reducedHeight > 150,
   };
 }

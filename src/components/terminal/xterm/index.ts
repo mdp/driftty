@@ -90,7 +90,18 @@ export interface TouchSelectionBox {
   top: number;
   width: number;
   height: number;
-  complete: boolean;
+}
+
+export type TouchSelectionStatus =
+  | 'idle'
+  | 'armed'
+  | 'selecting'
+  | 'complete';
+
+export interface TouchSelectionState {
+  status: TouchSelectionStatus;
+  box?: TouchSelectionBox;
+  copyAvailable?: boolean;
 }
 
 function toDisposable(f: () => void): IDisposable {
@@ -141,13 +152,15 @@ export class Xterm {
   private connectionStateListener?: (state: ConnectionState) => void;
   private inputModifier?: InputModifier;
   private modifierListener?: (modifier?: InputModifier) => void;
-  private touchSelectionListener?: (box?: TouchSelectionBox) => void;
+  private touchSelectionListener?: (state: TouchSelectionState) => void;
   private selectionGestureDisposables: IDisposable[] = [];
   private touchSelectionText = '';
   private readonly mobileViewer = this.options.viewer.formFactor === 'mobile';
   private webKeyboardActive = false;
   private fixedSize?: {columns: number; rows: number};
   private cancelTouchGesture?: () => void;
+  private armTouchGesture?: () => void;
+  private viewportYBeforeKeyboard?: number;
 
   private writeFunc = (data: ArrayBuffer) =>
     this.writeData(new Uint8Array(data));
@@ -192,8 +205,47 @@ export class Xterm {
     this.cancelTouchGesture?.();
   }
 
+  public armTouchSelection() {
+    this.armTouchGesture?.();
+  }
+
+  public touchSelectionBounds() {
+    return (
+      this.terminal?.element?.querySelector('.xterm-screen') as
+        | HTMLElement
+        | null
+    )?.getBoundingClientRect();
+  }
+
+  public updateTouchSelectionBox(box: TouchSelectionBox) {
+    this.touchSelectionText = this.textInsideBox(
+      box.left,
+      box.top,
+      box.left + box.width,
+      box.top + box.height,
+    );
+    this.touchSelectionListener?.({
+      status: 'complete',
+      box,
+      copyAvailable: Boolean(this.touchSelectionText),
+    });
+  }
+
   public scrollToBottom() {
     this.terminal?.scrollToBottom();
+  }
+
+  public captureKeyboardPosition() {
+    if (this.viewportYBeforeKeyboard !== undefined) return;
+    this.viewportYBeforeKeyboard =
+      this.terminal?.buffer.active.viewportY;
+  }
+
+  public restoreKeyboardPosition() {
+    const viewportY = this.viewportYBeforeKeyboard;
+    this.viewportYBeforeKeyboard = undefined;
+    if (viewportY === undefined) return;
+    this.terminal?.scrollToLine(viewportY);
   }
 
   public focus() {
@@ -238,7 +290,7 @@ export class Xterm {
   }
 
   public onTouchSelection(
-    listener?: (box?: TouchSelectionBox) => void
+    listener?: (state: TouchSelectionState) => void
   ) {
     this.touchSelectionListener = listener;
   }
@@ -252,7 +304,7 @@ export class Xterm {
     }
     this.overlayAddon?.showOverlay('\u2702', 300);
     this.touchSelectionText = '';
-    this.touchSelectionListener?.();
+    this.touchSelectionListener?.({status: 'idle'});
   }
 
   private clearListeners() {
@@ -396,18 +448,14 @@ export class Xterm {
   private initTouchSelection() {
     if (!this.mobileViewer || !this.terminal.element) return;
     const element = this.terminal.element;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     let startX = 0;
     let startY = 0;
     let currentX = 0;
     let currentY = 0;
     let selecting = false;
+    let armed = false;
     let pointerId: number | undefined;
 
-    const cancel = () => {
-      clearTimeout(timer);
-      timer = undefined;
-    };
     const screenBounds = () =>
       (
         this.terminal.element?.querySelector('.xterm-screen') as
@@ -423,38 +471,44 @@ export class Xterm {
         bounds,
       };
     };
-    const reportBox = (complete: boolean) => {
+    const reportBox = (status: 'selecting' | 'complete') => {
       const start = clampPoint(startX, startY);
       const current = clampPoint(currentX, currentY);
       if (!start || !current) return;
       this.touchSelectionListener?.({
-        left: Math.min(start.x, current.x),
-        top: Math.min(start.y, current.y),
-        width: Math.max(2, Math.abs(current.x - start.x)),
-        height: Math.max(2, Math.abs(current.y - start.y)),
-        complete,
+        status,
+        box: {
+          left: Math.min(start.x, current.x),
+          top: Math.min(start.y, current.y),
+          width: Math.max(2, Math.abs(current.x - start.x)),
+          height: Math.max(2, Math.abs(current.y - start.y)),
+        },
+        copyAvailable:
+          status === 'complete' && Boolean(this.touchSelectionText),
       });
     };
     const pointerDown = (rawEvent: Event) => {
       const event = rawEvent as PointerEvent;
-      if (event.pointerType !== 'touch' || event.button !== 0) return;
+      if (
+        !armed ||
+        event.pointerType !== 'touch' ||
+        event.button !== 0 ||
+        !screenBounds()
+      ) {
+        return;
+      }
+      event.preventDefault();
       startX = event.clientX;
       startY = event.clientY;
       currentX = startX;
       currentY = startY;
       pointerId = event.pointerId;
-      selecting = false;
+      selecting = true;
+      armed = false;
       this.touchSelectionText = '';
-      this.touchSelectionListener?.();
-      cancel();
-      timer = setTimeout(() => {
-        timer = undefined;
-        if (!screenBounds()) return;
-        selecting = true;
-        element.setPointerCapture?.(event.pointerId);
-        reportBox(false);
-        navigator.vibrate?.(15);
-      }, 525);
+      element.setPointerCapture?.(event.pointerId);
+      reportBox('selecting');
+      navigator.vibrate?.(15);
     };
     const pointerMove = (rawEvent: Event) => {
       const event = rawEvent as PointerEvent;
@@ -463,17 +517,12 @@ export class Xterm {
       currentY = event.clientY;
       if (selecting) {
         event.preventDefault();
-        reportBox(false);
-      } else if (
-        Math.hypot(event.clientX - startX, event.clientY - startY) > 12
-      ) {
-        cancel();
+        reportBox('selecting');
       }
     };
     const pointerUp = (rawEvent: Event) => {
       const event = rawEvent as PointerEvent;
       if (event.pointerId !== pointerId) return;
-      cancel();
       if (selecting) {
         currentX = event.clientX;
         currentY = event.clientY;
@@ -483,21 +532,29 @@ export class Xterm {
           currentX,
           currentY,
         );
-        if (this.touchSelectionText) reportBox(true);
-        else this.touchSelectionListener?.();
+        if (this.touchSelectionText) reportBox('complete');
+        else this.touchSelectionListener?.({status: 'idle'});
         element.releasePointerCapture?.(event.pointerId);
       }
       selecting = false;
       pointerId = undefined;
     };
     const pointerCancel = () => {
-      cancel();
+      armed = false;
       selecting = false;
       pointerId = undefined;
       this.touchSelectionText = '';
-      this.touchSelectionListener?.();
+      this.touchSelectionListener?.({status: 'idle'});
+    };
+    const arm = () => {
+      selecting = false;
+      pointerId = undefined;
+      armed = true;
+      this.touchSelectionText = '';
+      this.touchSelectionListener?.({status: 'armed'});
     };
     this.cancelTouchGesture = pointerCancel;
+    this.armTouchGesture = arm;
 
     this.selectionGestureDisposables.push(
       addEventListener(element, 'pointerdown', pointerDown),

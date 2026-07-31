@@ -51,7 +51,6 @@ export class VoiceComposer extends Component<Props, State> {
       mobile,
       value,
       onChange,
-      onClose,
       onTerminalAction,
       onToggleCtrl,
     }: Props,
@@ -72,7 +71,7 @@ export class VoiceComposer extends Component<Props, State> {
           <button
             type="button"
             class="voice-composer__header-close"
-            onClick={onClose}
+            onClick={this.close}
             aria-label="Close Composer and save draft"
           >
             Close
@@ -91,7 +90,7 @@ export class VoiceComposer extends Component<Props, State> {
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.preventDefault();
-              onClose();
+              this.close();
             }
           }}
           lang="en"
@@ -192,8 +191,14 @@ export class VoiceComposer extends Component<Props, State> {
   private send(action: ComposerAction) {
     const { value, onSend } = this.props;
     if (!value && action === 'insert') return;
+    this.textarea?.blur();
     onSend(composerSubmission(value, action));
   }
+
+  private close = () => {
+    this.textarea?.blur();
+    this.props.onClose();
+  };
 
   @bind
   private insertSlash() {

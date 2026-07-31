@@ -31,6 +31,7 @@ export const quickbarControls: Record<QuickbarMode, QuickbarControl[]> = {
     {label: 'L', control: 'L'},
     {label: 'R', control: 'R'},
   ],
+  copy: [],
 };
 
 export const scrollControls: QuickbarControl[] = [

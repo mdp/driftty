@@ -2,7 +2,7 @@ import { bind } from 'decko';
 import { Component, h } from 'preact';
 import {
   type ConnectionState,
-  TouchSelectionBox,
+  TouchSelectionState,
   Xterm,
   XtermOptions,
 } from './xterm';
@@ -26,6 +26,10 @@ import {
   type FixedMobileViewportView,
   type TerminalViewportSize,
 } from './fixed-mobile-viewport';
+import {
+  adjustTouchSelectionBox,
+  type TouchSelectionAdjustment,
+} from './touch-selection-box';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -49,7 +53,7 @@ interface State {
   quickbarHeight: number;
   scrollControls: boolean;
   ctrlArmed: boolean;
-  touchSelection?: TouchSelectionBox;
+  touchSelection: TouchSelectionState;
   fixedViewport: FixedMobileViewportView;
 }
 
@@ -62,6 +66,14 @@ export class Terminal extends Component<Props, State> {
   private layoutWidth = window.innerWidth;
   private readonly mobileViewer: boolean;
   private ctrlTimer?: number;
+  private selectionAdjustment?: {
+    type: TouchSelectionAdjustment;
+    pointerId: number;
+    pointerX: number;
+    pointerY: number;
+    box: NonNullable<TouchSelectionState['box']>;
+    bounds: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom'>;
+  };
 
   constructor(props: Props) {
     super();
@@ -93,6 +105,7 @@ export class Terminal extends Component<Props, State> {
       quickbarHeight: 0,
       scrollControls: false,
       ctrlArmed: false,
+      touchSelection: {status: 'idle'},
       fixedViewport: this.fixedMobileViewport.view,
     };
   }
@@ -222,25 +235,52 @@ export class Terminal extends Component<Props, State> {
           onToggle={this.toggleKeyboard}
           onHeightChange={this.handleWebKeyboardHeight}
         />
-        {touchSelection && (
+        {touchSelection.box && (
           <div
             class={`terminal-touch-selection ${
-              touchSelection.complete
+              touchSelection.status === 'complete'
                 ? 'terminal-touch-selection--complete'
                 : ''
             }`}
             style={{
-              left: `${touchSelection.left}px`,
-              top: `${touchSelection.top - viewportOffsetTop}px`,
-              width: `${touchSelection.width}px`,
-              height: `${touchSelection.height}px`,
+              left: `${touchSelection.box.left}px`,
+              top: `${touchSelection.box.top - viewportOffsetTop}px`,
+              width: `${touchSelection.box.width}px`,
+              height: `${touchSelection.box.height}px`,
             }}
+            onPointerDown={(event) =>
+              this.beginSelectionAdjustment('move', event)
+            }
+            onPointerMove={this.moveSelectionAdjustment}
+            onPointerUp={this.endSelectionAdjustment}
+            onPointerCancel={this.endSelectionAdjustment}
           >
-            {touchSelection.complete && (
+            {touchSelection.status === 'complete' && (
+              <>
+                <button
+                  type="button"
+                  class="terminal-selection-handle terminal-selection-handle--top-left"
+                  aria-label="Resize selection from top left"
+                  onPointerDown={(event) =>
+                    this.beginSelectionAdjustment('top-left', event)
+                  }
+                />
+                <button
+                  type="button"
+                  class="terminal-selection-handle terminal-selection-handle--bottom-right"
+                  aria-label="Resize selection from bottom right"
+                  onPointerDown={(event) =>
+                    this.beginSelectionAdjustment('bottom-right', event)
+                  }
+                />
+              </>
+            )}
+            {touchSelection.status === 'complete' && (
               <button
                 class="terminal-selection-copy"
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={this.copySelection}
+                disabled={!touchSelection.copyAvailable}
               >
                 Copy
               </button>
@@ -312,10 +352,18 @@ export class Terminal extends Component<Props, State> {
               scrollControls={scrollControls}
               onAction={this.sendTerminalAction}
               onControl={this.sendControl}
+              onText={this.sendText}
               onHeightChange={this.handleQuickbarHeight}
               onOpenComposer={this.openComposer}
               onOpenKeyboard={this.openKeyboard}
               onOpenMenu={this.openTerminalMenu}
+              onStartCopySelection={this.startCopySelection}
+              onCopySelection={this.copySelection}
+              onCancelCopySelection={this.cancelCopySelection}
+              touchSelectionStatus={touchSelection.status}
+              copySelectionAvailable={Boolean(
+                touchSelection.copyAvailable
+              )}
             />
           )}
         {!this.mobileViewer && !showKeyboard && !showComposer && (
@@ -365,6 +413,72 @@ export class Terminal extends Component<Props, State> {
 
   private copySelection = async () => {
     await this.xterm.copyTouchSelection();
+  };
+
+  private startCopySelection = () => {
+    this.xterm.armTouchSelection();
+  };
+
+  private cancelCopySelection = () => {
+    this.xterm.cancelTouchSelection();
+  };
+
+  private beginSelectionAdjustment = (
+    type: TouchSelectionAdjustment,
+    event: PointerEvent,
+  ) => {
+    const box = this.state.touchSelection.box;
+    const bounds = this.xterm.touchSelectionBounds();
+    if (
+      this.state.touchSelection.status !== 'complete' ||
+      !box ||
+      !bounds ||
+      event.button !== 0
+    ) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+    this.selectionAdjustment = {
+      type,
+      pointerId: event.pointerId,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      box,
+      bounds,
+    };
+  };
+
+  private moveSelectionAdjustment = (event: PointerEvent) => {
+    const adjustment = this.selectionAdjustment;
+    if (!adjustment || event.pointerId !== adjustment.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.xterm.updateTouchSelectionBox(
+      adjustTouchSelectionBox(
+        adjustment.box,
+        adjustment.type,
+        event.clientX - adjustment.pointerX,
+        event.clientY - adjustment.pointerY,
+        adjustment.bounds,
+      )
+    );
+  };
+
+  private endSelectionAdjustment = (event: PointerEvent) => {
+    if (
+      !this.selectionAdjustment ||
+      event.pointerId !== this.selectionAdjustment.pointerId
+    ) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.type !== 'pointercancel') {
+      this.moveSelectionAdjustment(event);
+    }
+    this.selectionAdjustment = undefined;
   };
 
   @bind
@@ -461,6 +575,11 @@ export class Terminal extends Component<Props, State> {
     this.clearCtrl();
   }
 
+  private sendText = (text: string) => {
+    this.xterm.sendData(text);
+    this.clearCtrl();
+  };
+
   @bind
   toggleCtrl() {
     if (this.state.ctrlArmed) {
@@ -555,6 +674,10 @@ export class Terminal extends Component<Props, State> {
       measurement.keyboardOpen && !this.state.softwareKeyboardOpen;
     const keyboardChanged =
       measurement.keyboardOpen !== this.state.softwareKeyboardOpen;
+    if (keyboardJustOpened) {
+      this.xterm.captureKeyboardPosition();
+      this.fixedMobileViewport.captureKeyboardPosition();
+    }
 
     this.setState(
       {
@@ -567,8 +690,13 @@ export class Terminal extends Component<Props, State> {
         requestAnimationFrame(() => {
           this.xterm.fit();
           if (keyboardChanged) {
-            this.xterm.scrollToBottom();
-            this.fixedMobileViewport.anchorBottom();
+            if (measurement.keyboardOpen) {
+              this.xterm.scrollToBottom();
+              this.fixedMobileViewport.anchorBottom();
+            } else {
+              this.xterm.restoreKeyboardPosition();
+              this.fixedMobileViewport.restoreKeyboardPosition();
+            }
           }
         });
       }

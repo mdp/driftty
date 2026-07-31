@@ -10,8 +10,7 @@ import type {
 
 const MAX_ROWS = 16;
 const MAX_URL_LENGTH = 2048;
-const FIRST_FRAGMENT = /^(\s*)(https?:\/\/\S+)\s*$/i;
-const CONTINUATION = /^(\s*)(\S+)/;
+const FIRST_FRAGMENT = /^https?:\/\/\S+$/i;
 
 export interface MultilineWebLink {
   range: IBufferRange;
@@ -40,55 +39,55 @@ function reconstructFrom(
   source: LineSource,
   startY: number,
   queriedY: number,
+  columns: number,
 ): MultilineWebLink | undefined {
   const firstLine = source.getLine(startY);
   if (!firstLine || firstLine.isWrapped) return undefined;
 
-  const first = FIRST_FRAGMENT.exec(firstLine.translateToString(true));
-  if (!first) return undefined;
+  const first = firstLine.translateToString(false, 0, columns);
+  if (
+    first.length !== columns ||
+    !FIRST_FRAGMENT.test(first) ||
+    /\s/.test(first)
+  ) {
+    return undefined;
+  }
 
-  const left = first[1].length;
-  const firstEnd = left + first[2].length;
-  let right = firstEnd;
-  let text = first[2];
-  let previousReachedRight = true;
+  let text = first;
   let endY = startY;
-  let endX = firstEnd;
+  let endX = columns;
   let fragments = 1;
+  let complete = false;
 
   for (let y = startY + 1; y < startY + MAX_ROWS; y++) {
-    if (!previousReachedRight) break;
     const line = source.getLine(y);
     if (!line) break;
     if (line.isWrapped) return undefined;
 
-    const value = line.translateToString(true);
-    const continuation = CONTINUATION.exec(value);
-    if (!continuation || continuation[1].length !== left) break;
-
-    const fragment = continuation[2];
+    const value = line.translateToString(false, 0, columns);
+    const fragment = value.trimEnd();
+    if (
+      !fragment ||
+      fragment.length > columns ||
+      /\s/.test(fragment)
+    ) {
+      return undefined;
+    }
     if (text.length + fragment.length > MAX_URL_LENGTH) return undefined;
 
     text += fragment;
     fragments++;
     endY = y;
-    endX = left + fragment.length;
-
-    if (fragments === 2 && endX >= firstEnd) {
-      // A CLI can put the URL prefix on a short first row (for example,
-      // "https://github.com/search?") before wrapping the query at its real
-      // content margin. The first continuation reveals that margin.
-      right = endX;
+    endX = fragment.length;
+    if (fragment.length < columns) {
+      complete = true;
+      break;
     }
-    previousReachedRight = endX === right;
-
-    // Anything after the first token is a delimiter/description, so this row
-    // is necessarily the end even when its token fills the content margin.
-    if (value.slice(endX).trim().length > 0) break;
   }
 
   if (
     fragments < 2 ||
+    !complete ||
     queriedY < startY ||
     queriedY > endY ||
     !isHttpUrl(text)
@@ -99,8 +98,8 @@ function reconstructFrom(
   return {
     text,
     range: {
-      start: { x: left + 1, y: startY + 1 },
-      end: { x: endX, y: endY + 1 },
+      start: {x: 1, y: startY + 1},
+      end: {x: endX, y: endY + 1},
     },
   };
 }
@@ -108,6 +107,7 @@ function reconstructFrom(
 export function findMultilineWebLink(
   source: LineSource,
   bufferLineNumber: number,
+  columns: number,
 ): MultilineWebLink | undefined {
   const queriedY = bufferLineNumber - 1;
   const firstPossibleY = Math.max(0, queriedY - MAX_ROWS + 1);
@@ -115,7 +115,7 @@ export function findMultilineWebLink(
   // Start at the hovered row, then scan upward so all fragments resolve to
   // the exact same reconstructed link and range.
   for (let startY = queriedY; startY >= firstPossibleY; startY--) {
-    const link = reconstructFrom(source, startY, queriedY);
+    const link = reconstructFrom(source, startY, queriedY, columns);
     if (link) return link;
   }
   return undefined;
@@ -148,6 +148,7 @@ class MultilineWebLinkProvider implements ILinkProvider {
     const link = findMultilineWebLink(
       this.terminal.buffer.active,
       bufferLineNumber,
+      this.terminal.cols,
     );
     callback(
       link

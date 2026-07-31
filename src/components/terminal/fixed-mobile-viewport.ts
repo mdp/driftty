@@ -11,7 +11,7 @@ export interface TerminalTransform {
 
 export type TerminalViewportSize =
   | 'auto'
-  | '80x24'
+  | '80x40'
   | '100x30'
   | '120x40'
   | `custom:${number}x${number}`;
@@ -22,7 +22,7 @@ export const terminalViewportSizes: Array<{
   description: string;
 }> = [
   {value: 'auto', label: 'Fit screen', description: 'Resize with the viewport'},
-  {value: '80x24', label: '80 × 24', description: 'Classic terminal'},
+  {value: '80x40', label: '80 × 40', description: 'Mobile workspace'},
   {value: '100x30', label: '100 × 30', description: 'Comfortable default'},
   {value: '120x40', label: '120 × 40', description: 'Large workspace'},
 ];
@@ -103,6 +103,7 @@ function loadTerminalViewportSize(
 ): TerminalViewportSize {
   try {
     const value = storage.getItem(storageKey);
+    if (value === '80x24') return '80x40';
     if (
       value &&
       (presetValues.includes(value as TerminalViewportSize) ||
@@ -173,6 +174,7 @@ export class FixedMobileViewport {
   private lastTap?: {time: number; x: number; y: number};
   private gestureUsed = false;
   private gesture?: ViewportGesture;
+  private transformBeforeKeyboard?: TerminalTransform;
 
   constructor({
     mobile,
@@ -224,6 +226,30 @@ export class FixedMobileViewport {
         ...this.currentView.transform,
         y: bounds.height - surface.height * this.currentView.transform.scale,
       }),
+    });
+  }
+
+  captureKeyboardPosition(): void {
+    if (this.transformBeforeKeyboard) return;
+    this.transformBeforeKeyboard = {...this.currentView.transform};
+  }
+
+  restoreKeyboardPosition(): void {
+    const transform = this.transformBeforeKeyboard;
+    this.transformBeforeKeyboard = undefined;
+    const bounds = this.viewport()?.getBoundingClientRect();
+    const surface = this.currentView.surface;
+    if (
+      !transform ||
+      !bounds ||
+      !surface ||
+      this.currentView.size === 'auto'
+    ) {
+      return;
+    }
+    this.update({
+      ...this.currentView,
+      transform: clampTransform(bounds, surface, transform),
     });
   }
 

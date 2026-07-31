@@ -87,15 +87,15 @@ function makeViewport({
 
 describe('fixed mobile viewport', () => {
   it('loads, applies, and persists terminal sizes through one interface', () => {
-    const {viewport, setItem, setFixedSize} = makeViewport({stored: '80x24'});
+    const {viewport, setItem, setFixedSize} = makeViewport({stored: '80x40'});
 
     viewport.start();
     expect(viewport.view).toEqual({
-      size: '80x24',
-      surface: {width: 640, height: 384},
-      transform: {x: 0, y: 0, scale: 0.5},
+      size: '80x40',
+      surface: {width: 640, height: 640},
+      transform: {x: 64, y: 0, scale: 0.3},
     });
-    expect(setFixedSize).toHaveBeenLastCalledWith({columns: 80, rows: 24});
+    expect(setFixedSize).toHaveBeenLastCalledWith({columns: 80, rows: 40});
 
     viewport.select(customTerminalViewportSize(240, 60));
     expect(viewport.view.size).toBe('custom:200x60');
@@ -113,8 +113,17 @@ describe('fixed mobile viewport', () => {
     expect(setFixedSize).toHaveBeenLastCalledWith();
   });
 
+  it('migrates the old mobile preset to 80 by 40', () => {
+    const {viewport, setFixedSize} = makeViewport({stored: '80x24'});
+
+    viewport.start();
+
+    expect(viewport.view.size).toBe('80x40');
+    expect(setFixedSize).toHaveBeenLastCalledWith({columns: 80, rows: 40});
+  });
+
   it('fits on desktop double-click only when the size is fixed', () => {
-    const fixed = makeViewport({stored: '80x24', mobile: false});
+    const fixed = makeViewport({stored: 'custom:80x24', mobile: false});
     fixed.viewport.start();
     const fixedEvent = {
       detail: 2,
@@ -147,7 +156,7 @@ describe('fixed mobile viewport', () => {
       viewport,
       cancelTouchSelection,
       setPointerCapture,
-    } = makeViewport({stored: '80x24'});
+    } = makeViewport({stored: 'custom:80x24'});
     viewport.start();
     const first = pointerEvent({id: 1, type: 'pointerdown', x: 100, y: 100});
     const second = pointerEvent({id: 2, type: 'pointerdown', x: 200, y: 100});
@@ -166,7 +175,7 @@ describe('fixed mobile viewport', () => {
   });
 
   it('fits a pinched surface on mobile double-tap', () => {
-    const {viewport} = makeViewport({stored: '80x24'});
+    const {viewport} = makeViewport({stored: 'custom:80x24'});
     viewport.start();
     viewport.handlePointer(
       pointerEvent({id: 1, type: 'pointerdown', x: 100, y: 100}),
@@ -224,7 +233,7 @@ describe('fixed mobile viewport', () => {
 
   it('anchors a fixed surface to the bottom after keyboard layout changes', () => {
     const {viewport, setBounds} = makeViewport({
-      stored: '80x24',
+      stored: 'custom:80x24',
     });
     viewport.start();
     expect(viewport.view.transform).toEqual({x: 0, y: 0, scale: 0.5});
@@ -233,6 +242,37 @@ describe('fixed mobile viewport', () => {
     viewport.anchorBottom();
 
     expect(viewport.view.transform).toEqual({x: 0, y: -32, scale: 0.5});
+  });
+
+  it('restores the pre-keyboard transform when the keyboard closes', () => {
+    const {viewport, setBounds} = makeViewport({stored: 'custom:80x24'});
+    viewport.start();
+    viewport.handlePointer(
+      pointerEvent({id: 1, type: 'pointerdown', x: 100, y: 100}),
+    );
+    viewport.handlePointer(
+      pointerEvent({id: 2, type: 'pointerdown', x: 200, y: 100}),
+    );
+    viewport.handlePointer(
+      pointerEvent({id: 2, type: 'pointermove', x: 300, y: 100}),
+    );
+    viewport.handlePointer(
+      pointerEvent({id: 1, type: 'pointerup', x: 100, y: 100}),
+    );
+    viewport.handlePointer(
+      pointerEvent({id: 2, type: 'pointerup', x: 300, y: 100}),
+    );
+    expect(viewport.view.transform).toEqual({x: -100, y: -100, scale: 1});
+
+    viewport.captureKeyboardPosition();
+    setBounds(viewportBounds(320, 160));
+    viewport.anchorBottom();
+    expect(viewport.view.transform.y).toBe(-224);
+
+    setBounds(viewportBounds());
+    viewport.restoreKeyboardPosition();
+
+    expect(viewport.view.transform).toEqual({x: -100, y: -100, scale: 1});
   });
 
   it('falls back to automatic sizing when the stored setting is invalid', () => {

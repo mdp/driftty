@@ -11,6 +11,8 @@ import {
   type QuickbarControl,
 } from './controls';
 import './terminal-quickbar.scss';
+import type {TouchSelectionStatus} from '../terminal/xterm';
+import {loadAgentLetters, rememberAgentLetter} from './letters';
 
 interface Props {
   ctrlArmed: boolean;
@@ -18,24 +20,35 @@ interface Props {
   scrollControls: boolean;
   onAction: (action: TerminalAction) => void;
   onControl: (character: string) => void;
+  onText: (text: string) => void;
   onHeightChange: (height: number) => void;
   onOpenComposer: () => void;
   onOpenKeyboard: () => void;
   onOpenMenu: () => void;
+  onStartCopySelection: () => void;
+  onCopySelection: () => void;
+  onCancelCopySelection: () => void;
+  touchSelectionStatus: TouchSelectionStatus;
+  copySelectionAvailable: boolean;
 }
 
 interface State {
   mode: QuickbarMode;
+  letterPickerOpen: boolean;
+  letters: string[];
 }
 
 export class TerminalQuickbar extends Component<Props, State> {
   private element?: HTMLElement;
   private resizeObserver?: ResizeObserver;
+  private letterPicker?: HTMLElement;
 
   constructor(props: Props) {
     super(props);
     this.state = {
       mode: loadQuickbarMode(window.sessionStorage),
+      letterPickerOpen: false,
+      letters: loadAgentLetters(window.localStorage),
     };
   }
 
@@ -43,11 +56,21 @@ export class TerminalQuickbar extends Component<Props, State> {
     if (!this.element) return;
     this.resizeObserver = new ResizeObserver(() => this.reportHeight());
     this.resizeObserver.observe(this.element);
+    document.addEventListener(
+      'pointerdown',
+      this.handleOutsidePointerDown,
+      true,
+    );
     this.reportHeight();
   }
 
   componentWillUnmount() {
     this.resizeObserver?.disconnect();
+    document.removeEventListener(
+      'pointerdown',
+      this.handleOutsidePointerDown,
+      true,
+    );
     this.props.onHeightChange(0);
   }
 
@@ -57,9 +80,15 @@ export class TerminalQuickbar extends Component<Props, State> {
     scrollControls,
     onAction,
     onControl,
+    onText,
     onOpenComposer,
     onOpenKeyboard,
     onOpenMenu,
+    onStartCopySelection,
+    onCopySelection,
+    onCancelCopySelection,
+    touchSelectionStatus,
+    copySelectionAvailable,
   }: Props) {
     return (
       <nav
@@ -75,7 +104,7 @@ export class TerminalQuickbar extends Component<Props, State> {
           </span>
         )}
         <div class="terminal-quickbar__modes" aria-label="Quickbar mode">
-          {(['agent', 'nav', 'tmux', 'ctrl'] as QuickbarMode[]).map(
+          {(['agent', 'nav', 'tmux', 'ctrl', 'copy'] as QuickbarMode[]).map(
             (mode) => (
               <button
                 key={mode}
@@ -93,7 +122,9 @@ export class TerminalQuickbar extends Component<Props, State> {
                   : mode === 'tmux'
                     ? 'tmux'
                     : mode === 'ctrl'
-                      ? 'Ctrl'
+                    ? 'Ctrl'
+                    : mode === 'copy'
+                      ? 'Copy'
                       : 'Agent'}
               </button>
             )
@@ -116,15 +147,40 @@ export class TerminalQuickbar extends Component<Props, State> {
           }
         >
           <div class="terminal-quickbar__shortcuts">
-            <QuickKey label="Esc" action="escape" onAction={onAction} danger />
+            {!scrollControls &&
+            this.state.mode === 'copy' &&
+            touchSelectionStatus !== 'idle' ? (
+              <button
+                type="button"
+                class="terminal-quickbar__key terminal-quickbar__key--danger"
+                onPointerDown={preventTerminalFocus}
+                onClick={onCancelCopySelection}
+              >
+                Cancel
+              </button>
+            ) : (
+              <QuickKey
+                label="Esc"
+                action="escape"
+                onAction={onAction}
+                danger
+              />
+            )}
             <div class="terminal-quickbar__context">
-              {this.renderControls(
-                scrollControls
-                  ? tmuxScrollControls
-                  : quickbarControls[this.state.mode],
-                onAction,
-                onControl
-              )}
+              {!scrollControls && this.state.mode === 'copy'
+                ? this.renderCopyControls(
+                    touchSelectionStatus,
+                    copySelectionAvailable,
+                    onStartCopySelection,
+                    onCopySelection,
+                  )
+                : this.renderControls(
+                    scrollControls
+                      ? tmuxScrollControls
+                      : quickbarControls[this.state.mode],
+                    onAction,
+                    onControl
+                  )}
             </div>
           </div>
           <div class="terminal-quickbar__fixed-actions">
@@ -153,6 +209,27 @@ export class TerminalQuickbar extends Component<Props, State> {
               )}
             </button>
           </div>
+          {this.state.letterPickerOpen && (
+            <div
+              ref={(element) => {
+                this.letterPicker = element ?? undefined;
+              }}
+              class="terminal-quickbar__letter-picker"
+              role="dialog"
+              aria-label="Choose the next slash-command letter"
+            >
+              {this.state.letters.map((letter) => (
+                <button
+                  key={letter}
+                  type="button"
+                  aria-label={`Type ${letter}`}
+                  onClick={() => this.selectAgentLetter(letter, onText)}
+                >
+                  {letter}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </nav>
     );
@@ -163,8 +240,9 @@ export class TerminalQuickbar extends Component<Props, State> {
   }
 
   private selectMode(mode: QuickbarMode) {
+    if (mode !== 'copy') this.props.onCancelCopySelection();
     saveQuickbarMode(window.sessionStorage, mode);
-    this.setState({mode});
+    this.setState({mode, letterPickerOpen: false});
   }
 
   private modeLabel(mode: QuickbarMode) {
@@ -182,7 +260,11 @@ export class TerminalQuickbar extends Component<Props, State> {
           key={control.label}
           label={control.label}
           action={control.action}
-          onAction={onAction}
+          onAction={
+            control.action === 'slash'
+              ? this.openAgentLetters
+              : onAction
+          }
           danger={control.danger}
         />
       ) : (
@@ -199,6 +281,70 @@ export class TerminalQuickbar extends Component<Props, State> {
           {control.label}
         </button>
       )
+    );
+  }
+
+  private openAgentLetters = () => {
+    this.props.onAction('slash');
+    this.setState({letterPickerOpen: true});
+  };
+
+  private selectAgentLetter = (
+    letter: string,
+    onText: Props['onText'] = this.props.onText,
+  ) => {
+    const letters = rememberAgentLetter(window.localStorage, letter);
+    onText(letter);
+    this.setState({letters, letterPickerOpen: false});
+  };
+
+  private handleOutsidePointerDown = (event: PointerEvent) => {
+    if (!this.state.letterPickerOpen) return;
+    const target = event.target;
+    if (target instanceof Node && this.letterPicker?.contains(target)) return;
+    this.setState({letterPickerOpen: false});
+  };
+
+  private renderCopyControls(
+    status: TouchSelectionStatus,
+    copyAvailable: boolean,
+    onStart: Props['onStartCopySelection'],
+    onCopy: Props['onCopySelection'],
+  ) {
+    if (status === 'complete') {
+      return (
+        <>
+          <span class="terminal-quickbar__copy-help">
+            Drag box or handles
+          </span>
+          <button
+            type="button"
+            class="terminal-quickbar__key terminal-quickbar__key--copy"
+            onPointerDown={preventTerminalFocus}
+            onClick={onCopy}
+            disabled={!copyAvailable}
+          >
+            Copy
+          </button>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <span class="terminal-quickbar__copy-help">
+          {status === 'idle' ? 'Tap, then drag over text' : 'Drag over text'}
+        </span>
+        <button
+          type="button"
+          class="terminal-quickbar__key terminal-quickbar__key--copy"
+          aria-pressed={status === 'armed' || status === 'selecting'}
+          onPointerDown={preventTerminalFocus}
+          onClick={onStart}
+        >
+          {status === 'idle' ? 'Select' : 'Ready'}
+        </button>
+      </>
     );
   }
 }

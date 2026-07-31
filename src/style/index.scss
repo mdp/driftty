@@ -165,6 +165,36 @@ body {
 
   &--complete {
     border-style: solid;
+    cursor: move;
+    pointer-events: auto;
+    touch-action: none;
+  }
+}
+
+.terminal-selection-handle {
+  position: absolute;
+  z-index: 1501;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: #59f3ff;
+  border: 3px solid rgba(5, 8, 11, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 2px 9px rgba(0, 0, 0, 0.5);
+  touch-action: none;
+
+  &--top-left {
+    top: 0;
+    left: 0;
+    cursor: nwse-resize;
+    transform: translate(-50%, -50%);
+  }
+
+  &--bottom-right {
+    right: 0;
+    bottom: 0;
+    cursor: nwse-resize;
+    transform: translate(50%, 50%);
   }
 }
 
@@ -184,6 +214,10 @@ body {
   pointer-events: auto;
   transform: translate(-50%, -100%);
   touch-action: manipulation;
+
+  &:disabled {
+    opacity: 0.5;
+  }
 
   &::after {
     position: absolute;

@@ -61,12 +61,11 @@ $magenta: #ff56d8;
   }
 
   &__shortcuts {
-    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
     overflow-x: auto;
     overscroll-behavior: none;
-    padding-right: 94px;
     scrollbar-width: none;
-    scroll-padding-right: 94px;
     touch-action: pan-x;
     -webkit-overflow-scrolling: touch;
 
@@ -76,10 +75,9 @@ $magenta: #ff56d8;
   }
 
   &__fixed-actions {
-    position: absolute;
-    top: 0;
-    right: 0;
+    position: relative;
     z-index: 1;
+    flex: 0 0 auto;
     padding-left: 6px;
     background: linear-gradient(
       90deg,
@@ -90,6 +88,7 @@ $magenta: #ff56d8;
   }
 
   &__key {
+    box-sizing: border-box;
     width: 44px;
     min-width: 44px;
     height: 44px;
@@ -131,9 +130,9 @@ $magenta: #ff56d8;
 
     &--compose {
       position: relative;
-      width: 49px;
-      min-width: 49px;
-      flex-basis: 49px;
+      width: 54px;
+      min-width: 54px;
+      flex-basis: 54px;
       color: $magenta;
       border-color: rgba($magenta, 0.42);
     }
@@ -151,14 +150,65 @@ $magenta: #ff56d8;
         stroke-width: 1.6;
       }
     }
+
+    &--copy {
+      width: 54px;
+      min-width: 54px;
+      flex-basis: 54px;
+      color: $cyan;
+    }
+  }
+
+  &__letter-picker {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    gap: 3px;
+    padding: 0 3px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    color: #d9eeee;
+    background: rgba(5, 14, 18, 0.99);
+    border: 1px solid rgba($cyan, 0.5);
+    border-radius: 3px;
+    box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.5);
+    scrollbar-width: none;
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    button {
+      box-sizing: border-box;
+      width: 44px;
+      min-width: 44px;
+      height: 42px;
+      padding: 0;
+      flex: 0 0 44px;
+      color: $cyan;
+      background: rgba(18, 38, 44, 0.96);
+      border: 1px solid rgba($cyan, 0.28);
+      border-radius: 3px;
+      font: 800 15px/1 ui-monospace, monospace;
+      text-transform: uppercase;
+      touch-action: manipulation;
+
+      &:active {
+        color: $void;
+        background: $cyan;
+      }
+    }
   }
 
   &__mode {
     position: relative;
-    min-width: 25%;
+    min-width: calc(100% / 6);
     height: 29px;
     padding: 0 4px;
-    flex: 0 0 25%;
+    flex: 0 0 calc(100% / 6);
     color: rgba(#d9eeee, 0.72);
     background: transparent;
     border: 0;
@@ -209,6 +259,16 @@ $magenta: #ff56d8;
     background: $magenta;
     border-radius: 50%;
     box-shadow: 0 0 5px rgba($magenta, 0.8);
+  }
+
+  &__copy-help {
+    display: flex;
+    min-width: 112px;
+    padding: 0 8px;
+    align-items: center;
+    color: rgba(#d9eeee, 0.78);
+    font: 600 9px/1.25 ui-monospace, monospace;
+    white-space: normal;
   }
 
   &__armed {
