@@ -43,7 +43,7 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           version="${VERSION#v}"
-          for image in driftty driftty-gateway; do
+          for image in driftty driftty-demo driftty-gateway; do
             docker buildx imagetools create \
               -t "ghcr.io/mdp/$image:$version" \
               -t "ghcr.io/mdp/$image:latest" \

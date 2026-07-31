@@ -15,6 +15,11 @@ The SSH gateway image that inherits the complete mobile terminal image and adds
 gateway capabilities.
 _Avoid_: Universal image, standalone gateway
 
+**Demo image**:
+A configured derivative of the mobile terminal image for trying driftty locally
+with an Alpine workspace, one tmux session, and a terminal coding agent.
+_Avoid_: Agent image, third deployment mode
+
 **Gateway bundle**:
 A versioned, ready-to-configure installation package for the gateway image and
 its required supporting processes. A bundle corresponds to one gateway release.
