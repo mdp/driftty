@@ -32,14 +32,15 @@ $magenta: #ff56d8;
   &__actions {
     position: relative;
     width: 100%;
-    min-height: 44px;
+    min-height: 46px;
     margin-top: 3px;
     overflow: hidden;
   }
 
   &__modes {
-    height: 31px;
-    padding: 1px;
+    height: 46px;
+    box-sizing: border-box;
+    padding: 0;
     gap: 0;
     overflow-x: auto;
     overscroll-behavior: none;
@@ -185,7 +186,7 @@ $magenta: #ff56d8;
       box-sizing: border-box;
       width: 44px;
       min-width: 44px;
-      height: 42px;
+      height: 44px;
       padding: 0;
       flex: 0 0 44px;
       color: $cyan;
@@ -206,7 +207,7 @@ $magenta: #ff56d8;
   &__mode {
     position: relative;
     min-width: calc(100% / 6);
-    height: 29px;
+    height: 44px;
     padding: 0 4px;
     flex: 0 0 calc(100% / 6);
     color: rgba(#d9eeee, 0.72);

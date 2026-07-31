@@ -86,7 +86,7 @@ export class TerminalMenu extends Component<Props> {
         }}
         class="terminal-menu"
         role="dialog"
-        aria-modal="false"
+        aria-modal={mobile ? 'true' : 'false'}
         aria-labelledby="terminal-menu-title"
         onPointerDown={this.handleSheetPointerDown}
         onPointerUp={this.handleSheetPointerUp}
@@ -141,9 +141,6 @@ export class TerminalMenu extends Component<Props> {
 
         {mobile && onTerminalAction && (
           <>
-            <span class="terminal-menu__announcement" aria-live="polite">
-              {ctrlArmed ? 'Ctrl armed' : ''}
-            </span>
             <MenuKeys title="Terminal">
               <MenuAction label="/" action="slash" send={onTerminalAction} />
               <MenuAction label="Space" action="space" send={onTerminalAction} />

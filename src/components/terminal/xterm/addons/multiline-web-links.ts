@@ -61,16 +61,19 @@ function reconstructFrom(
 
   for (let y = startY + 1; y < startY + MAX_ROWS; y++) {
     const line = source.getLine(y);
-    if (!line) break;
+    if (!line) {
+      complete = fragments >= 2;
+      break;
+    }
     if (line.isWrapped) return undefined;
 
     const value = line.translateToString(false, 0, columns);
     const fragment = value.trimEnd();
-    if (
-      !fragment ||
-      fragment.length > columns ||
-      /\s/.test(fragment)
-    ) {
+    if (!fragment) {
+      complete = fragments >= 2;
+      break;
+    }
+    if (fragment.length > columns || /\s/.test(fragment)) {
       return undefined;
     }
     if (text.length + fragment.length > MAX_URL_LENGTH) return undefined;

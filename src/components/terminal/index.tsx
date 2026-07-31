@@ -191,6 +191,12 @@ export class Terminal extends Component<Props, State> {
           transform: `translateY(${viewportOffsetTop}px)`,
         }}
       >
+        <span class="terminal-announcement" role="status" aria-live="polite">
+          Connection {connectionState}
+        </span>
+        <span class="terminal-announcement" role="status" aria-live="polite">
+          {ctrlArmed ? 'Ctrl armed' : 'Ctrl cancelled'}
+        </span>
         <div
           id={id}
           ref={(element) => {
@@ -483,6 +489,10 @@ export class Terminal extends Component<Props, State> {
 
   @bind
   openComposer() {
+    if (this.mobileViewer) {
+      this.xterm.captureKeyboardPosition();
+      this.fixedMobileViewport.captureKeyboardPosition();
+    }
     this.xterm.setWebKeyboardActive(false);
     this.setState({
       showComposer: true,

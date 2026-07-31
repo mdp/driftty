@@ -109,6 +109,11 @@ export class VoiceComposer extends Component<Props, State> {
           {(['escape', 'tab'] as TerminalAction[]).map((action) => (
             <button
               type="button"
+              aria-label={
+                action === 'escape'
+                  ? 'Send Escape to terminal'
+                  : 'Send Tab to terminal'
+              }
               onPointerDown={preserveTextareaFocus}
               onClick={() => onTerminalAction(action)}
             >
@@ -165,6 +170,7 @@ export class VoiceComposer extends Component<Props, State> {
           <button
             type="button"
             disabled={!value}
+            aria-label="Insert in terminal without Enter"
             onClick={() => this.send('insert')}
           >
             Insert
@@ -172,6 +178,7 @@ export class VoiceComposer extends Component<Props, State> {
           <button
             type="button"
             class="voice-composer__action--send"
+            aria-label="Send to terminal with Enter"
             onClick={() => this.send('insert-return')}
           >
             Send

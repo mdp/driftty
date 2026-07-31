@@ -99,7 +99,7 @@ export class TerminalQuickbar extends Component<Props, State> {
         aria-label={scrollControls ? 'Scroll controls' : 'Terminal quick actions'}
       >
         {ctrlArmed && (
-          <span class="terminal-quickbar__armed" role="status">
+          <span class="terminal-quickbar__armed" aria-hidden="true">
             Ctrl armed
           </span>
         )}

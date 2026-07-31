@@ -51,6 +51,23 @@ describe('findMultilineWebLink', () => {
     });
   });
 
+  it.each([
+    ['the buffer end', []],
+    ['a blank row', ['']],
+  ])('accepts an exact-width final fragment before %s', (_, suffix) => {
+    const url = `https://example.com/${'a'.repeat(44)}`;
+    const rows = [...wrap(url), ...suffix];
+
+    expect(url.length).toBe(columns * 2);
+    expect(findMultilineWebLink(buffer(rows), 2, columns)).toEqual({
+      text: url,
+      range: {
+        start: {x: 1, y: 1},
+        end: {x: columns, y: 2},
+      },
+    });
+  });
+
   it('rejects leading padding on the first fragment', () => {
     const url =
       ' https://example.com/a/long/path/to/a/resource?query=one&other=two';
