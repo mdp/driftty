@@ -43,10 +43,12 @@ function makeViewport({
   stored = null,
   mobile = true,
   bounds = viewportBounds(),
+  screen = {width: 1440, height: 900},
 }: {
   stored?: string | null;
   mobile?: boolean;
   bounds?: DOMRect;
+  screen?: {width: number; height: number};
 } = {}) {
   let currentBounds = bounds;
   const setItem = vi.fn();
@@ -69,6 +71,7 @@ function makeViewport({
       getBoundingClientRect: () => currentBounds,
       setPointerCapture,
     }),
+    screen,
     onChange: (view) => changes.push(view),
     schedule: (callback) => callback(),
   });
@@ -86,16 +89,77 @@ function makeViewport({
 }
 
 describe('fixed mobile viewport', () => {
+  it('defaults a first visit on a phone-like portrait screen to 80 by 60', () => {
+    const {viewport, setItem, setFixedSize} = makeViewport({
+      screen: {width: 393, height: 852},
+    });
+
+    viewport.start();
+
+    expect(viewport.view.size).toBe('80x60');
+    expect(setItem).toHaveBeenCalledWith(
+      'ttyd-mobile:terminal-viewport-size',
+      '80x60',
+    );
+    expect(setFixedSize).toHaveBeenLastCalledWith({columns: 80, rows: 60});
+  });
+
+  it('defaults a first desktop visit to fit screen', () => {
+    const {viewport, setItem, setFixedSize} = makeViewport({
+      screen: {width: 1440, height: 900},
+    });
+
+    viewport.start();
+
+    expect(viewport.view.size).toBe('auto');
+    expect(setItem).toHaveBeenCalledWith(
+      'ttyd-mobile:terminal-viewport-size',
+      'auto',
+    );
+    expect(setFixedSize).toHaveBeenLastCalledWith();
+  });
+
+  it('keeps a first phone visit in landscape fitted to the screen', () => {
+    const {viewport} = makeViewport({
+      screen: {width: 852, height: 393},
+    });
+
+    viewport.start();
+
+    expect(viewport.view.size).toBe('auto');
+  });
+
+  it('keeps a first portrait tablet visit fitted to the screen', () => {
+    const {viewport} = makeViewport({
+      screen: {width: 768, height: 1024},
+    });
+
+    viewport.start();
+
+    expect(viewport.view.size).toBe('auto');
+  });
+
+  it('preserves a saved size on a phone-like portrait screen', () => {
+    const {viewport} = makeViewport({
+      stored: '100x30',
+      screen: {width: 393, height: 852},
+    });
+
+    viewport.start();
+
+    expect(viewport.view.size).toBe('100x30');
+  });
+
   it('loads, applies, and persists terminal sizes through one interface', () => {
-    const {viewport, setItem, setFixedSize} = makeViewport({stored: '80x40'});
+    const {viewport, setItem, setFixedSize} = makeViewport({stored: '80x60'});
 
     viewport.start();
     expect(viewport.view).toEqual({
-      size: '80x40',
-      surface: {width: 640, height: 640},
-      transform: {x: 64, y: 0, scale: 0.3},
+      size: '80x60',
+      surface: {width: 640, height: 960},
+      transform: {x: 96, y: 0, scale: 0.2},
     });
-    expect(setFixedSize).toHaveBeenLastCalledWith({columns: 80, rows: 40});
+    expect(setFixedSize).toHaveBeenLastCalledWith({columns: 80, rows: 60});
 
     viewport.select(customTerminalViewportSize(240, 60));
     expect(viewport.view.size).toBe('custom:200x60');
@@ -113,12 +177,25 @@ describe('fixed mobile viewport', () => {
     expect(setFixedSize).toHaveBeenLastCalledWith();
   });
 
-  it('migrates the old mobile preset to 80 by 40', () => {
+  it('migrates the old 80 by 24 mobile preset to 80 by 60', () => {
     const {viewport, setFixedSize} = makeViewport({stored: '80x24'});
 
     viewport.start();
 
-    expect(viewport.view.size).toBe('80x40');
+    expect(viewport.view.size).toBe('80x60');
+    expect(setFixedSize).toHaveBeenLastCalledWith({columns: 80, rows: 60});
+  });
+
+  it('preserves a saved 80 by 40 choice as a custom size', () => {
+    const {viewport, setItem, setFixedSize} = makeViewport({stored: '80x40'});
+
+    viewport.start();
+
+    expect(viewport.view.size).toBe('custom:80x40');
+    expect(setItem).toHaveBeenCalledWith(
+      'ttyd-mobile:terminal-viewport-size',
+      'custom:80x40',
+    );
     expect(setFixedSize).toHaveBeenLastCalledWith({columns: 80, rows: 40});
   });
 

@@ -11,7 +11,7 @@ export interface TerminalTransform {
 
 export type TerminalViewportSize =
   | 'auto'
-  | '80x40'
+  | '80x60'
   | '100x30'
   | '120x40'
   | `custom:${number}x${number}`;
@@ -22,7 +22,7 @@ export const terminalViewportSizes: Array<{
   description: string;
 }> = [
   {value: 'auto', label: 'Fit screen', description: 'Resize with the viewport'},
-  {value: '80x40', label: '80 × 40', description: 'Mobile workspace'},
+  {value: '80x60', label: '80 × 60', description: 'Mobile workspace'},
   {value: '100x30', label: '100 × 30', description: 'Comfortable default'},
   {value: '120x40', label: '120 × 40', description: 'Large workspace'},
 ];
@@ -49,6 +49,7 @@ interface FixedMobileViewportElement {
 
 interface FixedMobileViewportOptions {
   mobile: boolean;
+  screen: Pick<Screen, 'width' | 'height'>;
   storage: Pick<Storage, 'getItem' | 'setItem'>;
   terminal: FixedMobileViewportTerminal;
   viewport: () => FixedMobileViewportElement | undefined;
@@ -99,11 +100,19 @@ export function fixedTerminalSize(
 }
 
 function loadTerminalViewportSize(
-  storage: Pick<Storage, 'getItem'>,
+  storage: Pick<Storage, 'getItem' | 'setItem'>,
+  screen: Pick<Screen, 'width' | 'height'>,
 ): TerminalViewportSize {
   try {
     const value = storage.getItem(storageKey);
-    if (value === '80x24') return '80x40';
+    if (value === '80x24') {
+      saveTerminalViewportSize(storage, '80x60');
+      return '80x60';
+    }
+    if (value === '80x40') {
+      saveTerminalViewportSize(storage, 'custom:80x40');
+      return 'custom:80x40';
+    }
     if (
       value &&
       (presetValues.includes(value as TerminalViewportSize) ||
@@ -114,7 +123,12 @@ function loadTerminalViewportSize(
   } catch {
     // Storage can be unavailable in private or embedded browsing contexts.
   }
-  return 'auto';
+  const shortEdge = Math.min(screen.width, screen.height);
+  const defaultSize = screen.height > screen.width && shortEdge <= 600
+    ? '80x60'
+    : 'auto';
+  saveTerminalViewportSize(storage, defaultSize);
+  return defaultSize;
 }
 
 function saveTerminalViewportSize(
@@ -178,6 +192,7 @@ export class FixedMobileViewport {
 
   constructor({
     mobile,
+    screen,
     storage,
     terminal,
     viewport,
@@ -191,7 +206,7 @@ export class FixedMobileViewport {
     this.onChange = onChange;
     this.schedule = schedule;
     this.currentView = {
-      size: loadTerminalViewportSize(storage),
+      size: loadTerminalViewportSize(storage, screen),
       transform: identityTransform,
     };
   }

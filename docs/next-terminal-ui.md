@@ -475,9 +475,12 @@ Settings are application controls, not a keyboard page. Phase 1 includes:
 - entry to the host/session router;
 - the legacy web keyboard.
 
-Terminal size choices include Fit screen, an 80 × 40 Mobile workspace preset,
-100 × 30, 120 × 40, and custom dimensions. A previously saved 80 × 24 preset
-is migrated to 80 × 40.
+Terminal size choices include Fit screen, an 80 × 60 Mobile workspace preset,
+100 × 30, 120 × 40, and custom dimensions. On a first visit, portrait screens
+with a short edge no larger than 600 CSS pixels use 80 × 60; other screens use
+Fit screen. The initial choice is saved, and later user choices always win.
+A previously saved 80 × 24 preset is migrated to 80 × 60. Saved 80 × 40
+choices retain their dimensions as a custom size.
 
 Do not show a decorative connected dot. Color may reinforce connection state
 but cannot be its only representation. Font size and appearance controls should
