@@ -1,11 +1,9 @@
 # Next Terminal UI
 
-**Status:** Product specification for prototype and implementation  
-**Updated:** 2026-07-27  
+**Status:** Product specification; Phase 1 implemented
+**Updated:** 2026-07-31
 **Scope:** Terminal input and terminal-level application controls on mobile,
-tablet, and desktop  
-**Companion:** [Current Terminal Input UI](./current-terminal-input-ui.md)
-documents the existing implementation
+tablet, and desktop
 
 ## 1. Decision summary
 
@@ -183,7 +181,7 @@ is hidden behind the Terminal menu and legacy keyboard.
 The compact control surface has a horizontally scrollable section rail:
 
 ```text
-[Agent] [Nav] [tmux] [Ctrl] → [More]
+[Agent] [Nav] [tmux] [Ctrl] [Copy] [More]
 ```
 
 `More` is the final rail item and opens the Terminal menu. The selected
@@ -195,9 +193,10 @@ default Agent strip is:
 ```
 
 The section rail and shortcut strip scroll independently. Keyboard and Compose
-remain fixed at the right edge while shortcuts pass beneath their masked
-surface. This gives later sections and shortcuts room without shrinking their
-labels. A hidden scrollbar must not prevent touch panning.
+remain fixed at the right edge in normal flow, next to rather than over the
+scrollable shortcut strip. This keeps every Agent action, including Enter,
+visible alongside the fixed controls at the iPhone 16 portrait width. A hidden
+scrollbar must not prevent touch panning.
 
 Why Enter is present: questionnaires commonly require a selection to be
 confirmed, and opening a keyboard merely to confirm it defeats the Quickbar.
@@ -239,7 +238,10 @@ release.
 Quickbar actions send their terminal sequence immediately on activation.
 
 - `Esc`, arrows, `Tab`, and `Enter` send the existing sequences.
-- `/` sends `/` to the terminal when Composer is closed.
+- `/` sends `/` to the terminal when Composer is closed, then opens a
+  horizontally scrollable letter picker. Choosing a letter sends it, closes
+  the picker, and moves that letter to the front for future slash commands.
+  The remembered order is shared across terminals in the same browser.
 - `Scroll` sends the configured tmux prefix followed by `[`.
 - `Compose` opens Composer without sending input.
 - `More` opens Terminal menu without sending input.
@@ -268,6 +270,15 @@ the UI. Opening More must always offer **Reset Quickbar**.
 
 Phase 2 may reconcile copy-mode state if the gateway can provide reliable tmux
 state. Until then, the UI must not claim that copy mode is definitely active.
+
+### 7.7 Touch selection
+
+Copy is a remembered Quickbar mode. **Select** arms the next touch so the user
+can drag a rectangular selection immediately; ordinary terminal touches do not
+start selection. After release, the selection box can be moved by dragging it
+or resized from its top-left and bottom-right handles. **Copy** remains
+available both in the Quickbar and on the selection box. Leaving Copy mode or
+choosing Cancel clears the selection.
 
 ## 8. Composer
 
@@ -370,6 +381,9 @@ After closing:
 
 - touch devices return to terminal view without programmatically opening the
   native keyboard;
+- once Composer has closed and the iOS keyboard has finished dismissing, the
+  terminal restores the scroll position and fixed-viewport transform captured
+  before Composer opened;
 - desktop returns focus to xterm;
 - opening Composer again restores text-area focus and selection when possible.
 
@@ -460,6 +474,10 @@ Settings are application controls, not a keyboard page. Phase 1 includes:
 - auto reconnect;
 - entry to the host/session router;
 - the legacy web keyboard.
+
+Terminal size choices include Fit screen, an 80 × 40 Mobile workspace preset,
+100 × 30, 120 × 40, and custom dimensions. A previously saved 80 × 24 preset
+is migrated to 80 × 40.
 
 Do not show a decorative connected dot. Color may reinforce connection state
 but cannot be its only representation. Font size and appearance controls should
@@ -562,6 +580,14 @@ The redesign must preserve:
 The corner hit area must not overlap the terminal scrollbar or capture mouse
 events outside its visible 24 px target.
 
+### 11.5 Wrapped web links
+
+The stock xterm link provider owns single-line and soft-wrapped URLs. The
+multiline provider handles only reliable, unpadded hard wraps: the URL starts
+in column one, each intermediate row fills the terminal width, and the final
+row is shorter. Indented, padded, or soft-wrapped candidates are deliberately
+left alone rather than reconstructed speculatively.
+
 ## 12. Tablet and hardware keyboard
 
 Tablet behavior follows input capability:
@@ -660,8 +686,8 @@ Escape behavior must be contextual:
 - Tab, Enter, arrows, and control sequences work in shells, tmux, and coding
   agents.
 - Desktop Shift-drag selection continues to work.
-- Mobile long-press selection does not conflict with Quickbar or sheet
-  gestures.
+- Mobile selection starts only after the user arms Copy mode, and its drag and
+  resize gestures do not conflict with Quickbar or sheet gestures.
 - Right-click behavior remains intact.
 - Composer paste uses xterm's paste path.
 - Insert never appends Enter.
@@ -708,7 +734,8 @@ This is the lowest-risk slice and fixes desktop without changing terminal input.
 2. Add Touch controls Auto / Always / Minimal if required.
 3. Make tmux prefix profile-configurable.
 4. Explore reliable tmux copy-mode reconciliation.
-5. Evaluate constrained Quickbar reordering.
+5. Evaluate constrained Quickbar action reordering; the slash-command letter
+   picker already promotes recently selected letters.
 6. Decide whether legacy QWERTY still earns a place.
 
 ## 18. Phase 1 acceptance criteria
@@ -753,9 +780,9 @@ This is the lowest-risk slice and fixes desktop without changing terminal input.
 
 These require hands-on testing but do not block Phase 1:
 
-1. Can all nine Quickbar actions remain understandable at the narrowest
-   supported portrait width, or should its center section scroll?
-2. Is Enter used often enough to remain pinned, or should Space replace it?
+1. Can Quickbar actions remain understandable below the tested iPhone 16
+   portrait width while retaining 44 px targets?
+2. Should Enter remain in the Agent strip after usage data is available?
 3. Does the Scroll-controls layout remain synchronized well enough without
    gateway-provided tmux state?
 4. Should Composer use a compact sheet or expand to a larger detent while
