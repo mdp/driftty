@@ -19,6 +19,8 @@ jobs:
         include:
           - target: generic
             image: driftty
+          - target: demo
+            image: driftty-demo
           - target: gateway
             image: driftty-gateway
     steps:

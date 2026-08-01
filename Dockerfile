@@ -26,6 +26,34 @@ EXPOSE 7681
 ENTRYPOINT ["/usr/local/bin/driftty"]
 CMD ["sh"]
 
+FROM generic AS demo
+
+ARG OPENCODE_VERSION=1.18.10
+ENV OPENCODE_VERSION=${OPENCODE_VERSION}
+
+RUN apk add --no-cache bash git nodejs npm ripgrep tmux \
+    && npm install --global "opencode-ai@${OPENCODE_VERSION}" \
+    && npm cache clean --force \
+    && adduser -D -s /bin/bash demo \
+    && mkdir -p /workspace \
+    && chown demo:demo /workspace
+
+COPY docker/demo-entrypoint.sh /usr/local/bin/driftty-demo
+COPY docker/demo-first-login.sh /usr/local/bin/driftty-demo-first-login
+COPY --chown=demo:demo docker/demo.bash_profile /home/demo/.bash_profile
+RUN chmod 0755 \
+    /usr/local/bin/driftty-demo \
+    /usr/local/bin/driftty-demo-first-login
+
+ENV HOME=/home/demo \
+    DRIFTTY_DEMO_AGENT=opencode
+WORKDIR /workspace
+USER demo
+
+EXPOSE 7117
+ENTRYPOINT ["/usr/local/bin/driftty-demo"]
+CMD []
+
 FROM oven/bun:1-alpine AS bun-runtime
 
 FROM generic AS gateway

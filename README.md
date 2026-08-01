@@ -32,15 +32,15 @@ both ways of running driftty provide the same mobile experience.
   the underlying shell has actually exited.
 - A single-file web client embedded directly into the container image.
 
-## Two ways to run driftty
+## Images
 
-| | Mobile terminal image | Gateway image |
-| --- | --- | --- |
-| Use it for | One command or local shell | Multiple SSH hosts and tmux shells |
-| Image | `ghcr.io/mdp/driftty` | `ghcr.io/mdp/driftty-gateway` |
-| Configuration | Docker command arguments | YAML profiles and SSH keys |
-| Routing | One terminal | Host picker and stable shell URLs |
-| Persistence | Lifetime of the command | Remote tmux sessions survive gateway restarts |
+| | Mobile terminal image | Demo image | Gateway image |
+| --- | --- | --- | --- |
+| Use it for | One command or local shell | Local OpenCode trial | Multiple SSH hosts and tmux shells |
+| Image | `ghcr.io/mdp/driftty` | `ghcr.io/mdp/driftty-demo` | `ghcr.io/mdp/driftty-gateway` |
+| Configuration | Docker command arguments | No configuration required | YAML profiles and SSH keys |
+| Routing | One terminal | One tmux workspace | Host picker and stable shell URLs |
+| Persistence | Lifetime of the command | Lifetime of the container | Remote tmux sessions survive gateway restarts |
 
 ### Run any command
 
@@ -66,6 +66,32 @@ docker run --rm -p 8080:8080 \
 
 The image enables writable input and embeds the complete client at
 `/usr/share/ttyd/index.html`.
+
+### Try the OpenCode demo
+
+The demo image opens OpenCode inside a persistent tmux session. Run:
+
+```bash
+docker run --rm \
+  -p 127.0.0.1:7117:7117 \
+  ghcr.io/mdp/driftty-demo:edge
+```
+
+Open <http://localhost:7117>. The first terminal login starts OpenCode; if it
+exits, the pane continues as a Bash shell. Refreshing or reconnecting attaches
+to the same `driftty-demo` tmux session and does not start OpenCode again.
+
+To let OpenCode work on the current directory, mount it as the demo workspace:
+
+```bash
+docker run --rm \
+  -p 127.0.0.1:7117:7117 \
+  -v "$PWD:/workspace" \
+  ghcr.io/mdp/driftty-demo:edge
+```
+
+The demo endpoint has no authentication. Keep the published port bound to
+`127.0.0.1` and do not expose it to an untrusted network.
 
 ### Install the SSH gateway
 
@@ -191,6 +217,7 @@ npm ci
 npm run test:all
 npm run build
 docker build --target generic -t driftty .
+docker build --target demo -t driftty-demo .
 docker build --target gateway -t driftty-gateway .
 CLOUDFLARE_TUNNEL_TOKEN=validation docker compose config --quiet
 ```
