@@ -14,62 +14,22 @@ a phone browser. It builds on [ttyd](https://github.com/tsl0922/ttyd) and adds
 the controls, viewport behavior, and connection handling that terminal work on
 a small touchscreen needs.
 
-Run it as a lightweight container around any command, or use the gateway to
-reach multiple SSH hosts and persistent tmux sessions through one web entry
-point. The gateway image inherits the exact client from the terminal image, so
-both ways of running driftty provide the same mobile experience.
+**Goals:**
 
-## What it provides
+- One mobile terminal experience, no matter how driftty is run. The gateway
+  image inherits the exact client from the mobile terminal image, so direct
+  containers and gateway routes present the same touchscreen-optimized UI.
+- Terminal work from anywhere, toward long-lived remote shells. The gateway
+  reaches multiple SSH hosts and persistent tmux sessions through one web entry
+  point, and terminal routes keep stable public URLs across reconnects.
+- A lightweight footprint. Run it as a single container around any command, or
+  add the gateway layer when you need SSH routing.
 
-- A fixed-size terminal viewport with presets, custom dimensions, pinch zoom,
-  and double-tap fitting.
-- Controls for common terminal keys, tmux actions, navigation, and one-shot
-  modifiers without opening a full software keyboard.
-- A composer for typing, pasting, and dictating longer commands before sending
-  them to the terminal.
-- Layout behavior that accounts for phone safe areas and on-screen keyboards.
-- Automatic reconnection for interrupted networks and a clear final state when
-  the underlying shell has actually exited.
-- A single-file web client embedded directly into the container image.
+## Quick start: try it with OpenCode
 
-## Images
-
-| | Mobile terminal image | Demo image | Gateway image |
-| --- | --- | --- | --- |
-| Use it for | One command or local shell | Local OpenCode trial | Multiple SSH hosts and tmux shells |
-| Image | `ghcr.io/mdp/driftty` | `ghcr.io/mdp/driftty-demo` | `ghcr.io/mdp/driftty-gateway` |
-| Configuration | Docker command arguments | No configuration required | YAML profiles and SSH keys |
-| Routing | One terminal | One tmux workspace | Host picker and stable shell URLs |
-| Persistence | Lifetime of the command | Lifetime of the container | Remote tmux sessions survive gateway restarts |
-
-### Run any command
-
-The mobile terminal image has no SSH, profile, gateway, or Cloudflare
-dependencies. Pass it the command you want ttyd to run:
-
-```bash
-docker run --rm -p 7681:7681 \
-  ghcr.io/mdp/driftty:latest \
-  sh
-```
-
-Open <http://localhost:7681>.
-
-Arguments are passed directly to ttyd, so ttyd options can come before the
-child command:
-
-```bash
-docker run --rm -p 8080:8080 \
-  ghcr.io/mdp/driftty:latest \
-  --port 8080 --client-option titleFixed="My terminal" bash
-```
-
-The image enables writable input and embeds the complete client at
-`/usr/share/ttyd/index.html`.
-
-### Try the OpenCode demo
-
-The demo image opens OpenCode inside a persistent tmux session. Run:
+The quickest way to see driftty is the demo image. It opens
+[OpenCode](https://opencode.ai) inside a persistent tmux session, so you can
+drive a coding agent from a phone browser immediately:
 
 ```bash
 docker run --rm \
@@ -93,9 +53,10 @@ docker run --rm \
 The demo endpoint has no authentication. Keep the published port bound to
 `127.0.0.1` and do not expose it to an untrusted network.
 
-### Install the SSH gateway
+## Installation: install the SSH gateway
 
-Download the Compose bundle from the latest GitHub release, unpack it, and run:
+For real, long-lived access to your own shells, install the gateway. Download
+the gateway bundle from the latest GitHub release, unpack it, and run:
 
 ```bash
 cp .env.example .env
@@ -111,12 +72,12 @@ Then:
 4. Point the Cloudflare tunnel origin to `http://gateway:7681`.
 5. Start the gateway with `docker compose up -d`.
 
-Each release bundle pins the gateway image to the matching driftty version.
-SSH configuration and private keys are mounted read-only. Learned host keys
-live in a named Docker volume, and the key generator is the only process given
-writable access to the keys directory.
+Each gateway bundle pins the gateway image to the matching driftty version and
+is ready to configure: SSH configuration and private keys are mounted
+read-only, learned host keys live in a named Docker volume, and the key
+generator is the only process given writable access to the keys directory.
 
-## Configure hosts and shells
+### Configure hosts and shells
 
 A profile can open a direct SSH shell, expose pinned tmux sessions, allow new
 managed sessions, or combine pinned and managed sessions:
@@ -169,7 +130,59 @@ Gateway restarts and browser disconnects therefore do not end remote work.
 Surviving a restart of the remote SSH host itself still requires tmux
 persistence tooling on that host.
 
-## Connection and security model
+## Technical details
+
+### Images
+
+| | Mobile terminal image | Demo image | Gateway image |
+| --- | --- | --- | --- |
+| Use it for | One command or local shell | Local OpenCode trial | Multiple SSH hosts and tmux shells |
+| Image | `ghcr.io/mdp/driftty` | `ghcr.io/mdp/driftty-demo` | `ghcr.io/mdp/driftty-gateway` |
+| Configuration | Docker command arguments | No configuration required | YAML profiles and SSH keys |
+| Routing | One terminal | One tmux workspace | Host picker and stable shell URLs |
+| Persistence | Lifetime of the command | Lifetime of the container | Remote tmux sessions survive gateway restarts |
+
+### What the mobile terminal image provides
+
+The client embedded in every image offers:
+
+- A fixed mobile viewport with presets, custom dimensions, pinch zoom, and
+  double-tap fitting.
+- Controls for common terminal keys, tmux actions, navigation, and one-shot
+  modifiers without opening a full software keyboard.
+- A composer for typing, pasting, and dictating longer commands before sending
+  them to the terminal.
+- Layout behavior that accounts for phone safe areas and on-screen keyboards.
+- Automatic reconnection for interrupted networks and a clear final state when
+  the underlying shell has actually exited.
+- A single-file web client embedded directly into the container image.
+
+### Run any command
+
+The mobile terminal image has no SSH, profile, gateway, or Cloudflare
+dependencies. Pass it the command you want ttyd to run:
+
+```bash
+docker run --rm -p 7681:7681 \
+  ghcr.io/mdp/driftty:latest \
+  sh
+```
+
+Open <http://localhost:7681>.
+
+Arguments are passed directly to ttyd, so ttyd options can come before the
+child command:
+
+```bash
+docker run --rm -p 8080:8080 \
+  ghcr.io/mdp/driftty:latest \
+  --port 8080 --client-option titleFixed="My terminal" bash
+```
+
+The image enables writable input and embeds the complete client at
+`/usr/share/ttyd/index.html`.
+
+### Connection and security model
 
 Each browser connection gets a separate SSH process. Session-routed
 connections attach that process to the selected tmux session.
@@ -183,7 +196,9 @@ When a shell exits normally, driftty stops reconnecting and shows an **Exited**
 screen. Unexpected network interruptions use automatic reconnection with
 backoff.
 
-## Local development
+## Development
+
+### Local development
 
 The development stack runs Vite with hot module replacement and an isolated
 Alpine shell:
@@ -208,7 +223,7 @@ docker compose -f compose.local.yaml up --build -d
 This uses the same `config/profiles.yaml`, `keys/`, known-hosts volume, and
 tunnel token as the released stack while building `driftty-gateway:local`.
 
-## Build and test
+### Build and test
 
 Requirements: Node 24+, Bun, and Docker.
 

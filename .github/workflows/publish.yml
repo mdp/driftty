@@ -15,6 +15,7 @@ jobs:
   images:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: generic
@@ -26,6 +27,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
+      - name: Ensure buildkit image is available (retry Docker Hub pull)
+        run: |
+          retry() {
+            for attempt in 1 2 3 4 5; do
+              if docker pull moby/buildkit:buildx-stable-1; then
+                return 0
+              fi
+              echo "Docker Hub pull failed (attempt ${attempt}/5); retrying in $((attempt * 10))s"
+              sleep "$((attempt * 10))"
+            done
+            return 1
+          }
+          retry
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
