@@ -19,7 +19,7 @@ export function caddyConfig(
 	redir @${profile.slug}Bare /${profile.slug}/ 308
 
 	handle /${profile.slug}/* {
-		reverse_proxy 127.0.0.1:${profile.ttydPort}
+		reverse_proxy 127.0.0.1:${profile.ttydPort} ${proxyCompressionUpstream()}
 	}`).join('\n');
 
   const sessions = sessionRoutes.map((route, index) => `
@@ -28,11 +28,11 @@ export function caddyConfig(
 
 	@session${index}Root path /${route.hostSlug}/${route.sessionSlug}/
 	handle @session${index}Root {
-		reverse_proxy 127.0.0.1:${pickerPort}
+		reverse_proxy 127.0.0.1:${pickerPort} ${proxyCompressionUpstream()}
 	}
 
 	handle /${route.hostSlug}/${route.sessionSlug}/* {
-		reverse_proxy 127.0.0.1:${route.ttydPort}
+		reverse_proxy 127.0.0.1:${route.ttydPort} ${proxyCompressionUpstream()}
 	}`).join('\n');
 
   return `{
@@ -45,8 +45,14 @@ ${sessions}
 ${legacy}
 
 	handle {
-		reverse_proxy 127.0.0.1:${pickerPort}
+		reverse_proxy 127.0.0.1:${pickerPort} ${proxyCompressionUpstream()}
 	}
 }
 `;
+
+function proxyCompressionUpstream(): string {
+	return `{
+			header_up -Sec-WebSocket-Extensions
+		}`;
+}
 }

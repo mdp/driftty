@@ -16,6 +16,15 @@ describe('generated Caddy configuration', () => {
     expect(config).not.toContain('handle_path');
   });
 
+  test('strips the WebSocket compression offer before reaching ttyd', () => {
+    const config = caddyConfig([profile('baz', 7800)], [
+      {hostSlug: 'aachen', sessionSlug: 'mdp', ttydPort: 7801},
+    ]);
+    expect(config).toContain('header_up -Sec-WebSocket-Extensions');
+    expect(config).toContain('reverse_proxy 127.0.0.1:7800 {');
+    expect(config).toContain('reverse_proxy 127.0.0.1:7801 {');
+  });
+
   test('routes individual tmux sessions and falls back to the picker', () => {
     const config = caddyConfig([], [
       {hostSlug: 'aachen', sessionSlug: 'mdp', ttydPort: 7800},

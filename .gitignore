@@ -77,3 +77,6 @@ CLAUDE.md
 keys/*
 !keys/.gitkeep
 config/profiles.yaml
+
+# Private incident artifacts (never commit paste/trigger content)
+paste.txt
