@@ -37,6 +37,7 @@ interface FixedMobileViewportTerminal {
   cellSize(): {width: number; height: number} | undefined;
   setFixedSize(size?: FixedTerminalSize): void;
   cancelTouchSelection(): void;
+  cancelTouchScroll(): void;
 }
 
 interface FixedMobileViewportElement {
@@ -342,6 +343,7 @@ export class FixedMobileViewport {
     event.preventDefault();
     event.stopPropagation();
     this.terminal.cancelTouchSelection();
+    this.terminal.cancelTouchScroll();
     this.viewport()?.setPointerCapture?.(event.pointerId);
     const [first, second] = [...this.pointers.values()];
     const center = {

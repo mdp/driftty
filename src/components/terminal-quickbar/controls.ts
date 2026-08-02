@@ -3,7 +3,8 @@ import type {QuickbarMode} from './mode';
 
 export type QuickbarControl =
   | {label: string; action: TerminalAction; danger?: boolean}
-  | {label: string; control: string; danger?: boolean};
+  | {label: string; control: string; danger?: boolean}
+  | {label: string; text: string; danger?: boolean};
 
 export const quickbarControls: Record<QuickbarMode, QuickbarControl[]> = {
   agent: [
@@ -12,6 +13,8 @@ export const quickbarControls: Record<QuickbarMode, QuickbarControl[]> = {
     {label: 'Tab', action: 'tab'},
     {label: '/', action: 'slash'},
     {label: 'Enter', action: 'enter'},
+    {label: '⇧Tab', action: 'shift-tab'},
+    {label: '$', text: '$'},
   ],
   nav: [
     {label: '←', action: 'left'},
@@ -39,4 +42,5 @@ export const scrollControls: QuickbarControl[] = [
   {label: '↓', action: 'down'},
   {label: 'PgUp', action: 'page-up'},
   {label: 'PgDn', action: 'page-down'},
+  {label: 'End', action: 'tmux-scroll-exit'},
 ];

@@ -3,7 +3,7 @@ import {quickbarControls, scrollControls} from './controls';
 
 describe('Quickbar contextual controls', () => {
   it.each([
-    ['agent', ['↑', '↓', 'Tab', '/', 'Enter']],
+    ['agent', ['↑', '↓', 'Tab', '/', 'Enter', '⇧Tab', '$']],
     ['nav', ['←', '↑', '↓', '→']],
     ['tmux', ['Scroll', 'Prev', 'Next', 'New']],
     ['ctrl', ['C', 'D', 'L', 'R']],
@@ -17,6 +17,7 @@ describe('Quickbar contextual controls', () => {
       '↓',
       'PgUp',
       'PgDn',
+      'End',
     ]);
   });
 

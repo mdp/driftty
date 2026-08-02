@@ -79,13 +79,23 @@ $magenta: #ff56d8;
     position: relative;
     z-index: 1;
     flex: 0 0 auto;
-    padding-left: 6px;
+    padding-left: 8px;
     background: linear-gradient(
       90deg,
       transparent,
       rgba(5, 8, 11, 0.96) 6px,
       rgba(5, 8, 11, 0.99) 100%
     );
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 7px;
+      bottom: 7px;
+      left: 2px;
+      width: 1px;
+      background: rgba($cyan, 0.35);
+    }
   }
 
   &__key {

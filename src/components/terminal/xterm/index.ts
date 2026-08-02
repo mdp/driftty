@@ -160,6 +160,7 @@ export class Xterm {
   private fixedSize?: {columns: number; rows: number};
   private cancelTouchGesture?: () => void;
   private armTouchGesture?: () => void;
+  private cancelTouchScrollGesture?: () => void;
   private viewportYBeforeKeyboard?: number;
 
   private writeFunc = (data: ArrayBuffer) =>
@@ -203,6 +204,10 @@ export class Xterm {
 
   public cancelTouchSelection() {
     this.cancelTouchGesture?.();
+  }
+
+  public cancelTouchScroll() {
+    this.cancelTouchScrollGesture?.();
   }
 
   public armTouchSelection() {
@@ -442,6 +447,7 @@ export class Xterm {
     this.applyNativeInputState();
     this.initDesktopSelection();
     this.initTouchSelection();
+    this.initTouchScroll();
     fitAddon.fit();
   }
 
@@ -560,6 +566,97 @@ export class Xterm {
       addEventListener(element, 'pointerdown', pointerDown),
       addEventListener(element, 'pointermove', pointerMove),
       addEventListener(element, 'pointerup', pointerUp),
+      addEventListener(element, 'pointercancel', pointerCancel),
+    );
+  }
+
+  private initTouchScroll() {
+    if (!this.mobileViewer || !this.terminal.element) return;
+    const element = this.terminal.element;
+    let pointerId: number | undefined;
+    let startX = 0;
+    let startY = 0;
+    let lastY = 0;
+    let scrolling = false;
+
+    const reset = () => {
+      if (pointerId !== undefined) {
+        element.releasePointerCapture?.(pointerId);
+      }
+      pointerId = undefined;
+      scrolling = false;
+    };
+    const pointerDown = (rawEvent: Event) => {
+      const event = rawEvent as PointerEvent;
+      if (
+        event.defaultPrevented ||
+        event.pointerType !== 'touch' ||
+        event.button !== 0
+      ) {
+        return;
+      }
+      if (pointerId !== undefined) {
+        reset();
+        return;
+      }
+      pointerId = event.pointerId;
+      startX = event.clientX;
+      startY = event.clientY;
+      lastY = startY;
+    };
+    const pointerMove = (rawEvent: Event) => {
+      const event = rawEvent as PointerEvent;
+      if (event.pointerId !== pointerId) return;
+      if (event.defaultPrevented) {
+        reset();
+        return;
+      }
+      const deltaX = event.clientX - startX;
+      const deltaY = event.clientY - startY;
+      if (!scrolling) {
+        if (Math.hypot(deltaX, deltaY) < 12) return;
+        if (Math.abs(deltaY) < Math.abs(deltaX)) {
+          reset();
+          return;
+        }
+        scrolling = true;
+        element.setPointerCapture?.(event.pointerId);
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const wheelTarget = this.terminal.element?.querySelector(
+        '.xterm-viewport',
+      ) as HTMLElement | null;
+      const wheelDelta = lastY - event.clientY;
+      lastY = event.clientY;
+      if (!wheelTarget || wheelDelta === 0) return;
+      wheelTarget.dispatchEvent(
+        new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: wheelDelta,
+        }),
+      );
+    };
+    const pointerEnd = (rawEvent: Event) => {
+      const event = rawEvent as PointerEvent;
+      if (event.pointerId !== pointerId) return;
+      if (scrolling) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      reset();
+    };
+    const pointerCancel = () => reset();
+
+    this.cancelTouchScrollGesture = pointerCancel;
+    this.selectionGestureDisposables.push(
+      addEventListener(element, 'pointerdown', pointerDown),
+      addEventListener(element, 'pointermove', pointerMove),
+      addEventListener(element, 'pointerup', pointerEnd),
       addEventListener(element, 'pointercancel', pointerCancel),
     );
   }

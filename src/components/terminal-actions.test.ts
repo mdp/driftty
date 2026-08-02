@@ -8,6 +8,9 @@ describe('terminal actions', () => {
     expect(terminalActionSequence('left')).toBe('\x1b[D');
     expect(terminalActionSequence('right')).toBe('\x1b[C');
     expect(terminalActionSequence('tmux-scroll')).toBe('\x02[');
+    expect(terminalActionSequence('tab')).toBe('\t');
+    expect(terminalActionSequence('shift-tab')).toBe('\x1b[Z');
+    expect(terminalActionSequence('slash')).toBe('/');
     expect(terminalActionSequence('tmux-next')).toBe('\x02n');
   });
 

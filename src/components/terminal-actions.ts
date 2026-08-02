@@ -7,6 +7,7 @@ export type TerminalAction =
   | 'left'
   | 'right'
   | 'tab'
+  | 'shift-tab'
   | 'enter'
   | 'slash'
   | 'space'
@@ -31,6 +32,7 @@ const actionSequences: Record<TerminalAction, string> = {
   left: sequences.left,
   right: sequences.right,
   tab: sequences.tab,
+  'shift-tab': sequences.shiftTab,
   enter: '\r',
   slash: '/',
   space: ' ',

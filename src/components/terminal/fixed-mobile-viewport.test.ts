@@ -54,6 +54,7 @@ function makeViewport({
   const setItem = vi.fn();
   const setFixedSize = vi.fn();
   const cancelTouchSelection = vi.fn();
+  const cancelTouchScroll = vi.fn();
   const setPointerCapture = vi.fn();
   const changes: FixedMobileViewportView[] = [];
   const viewport = new FixedMobileViewport({
@@ -66,6 +67,7 @@ function makeViewport({
       cellSize: () => ({width: 8, height: 16}),
       setFixedSize,
       cancelTouchSelection,
+      cancelTouchScroll,
     },
     viewport: () => ({
       getBoundingClientRect: () => currentBounds,
@@ -80,6 +82,7 @@ function makeViewport({
     setItem,
     setFixedSize,
     cancelTouchSelection,
+    cancelTouchScroll,
     setPointerCapture,
     changes,
     setBounds: (nextBounds: DOMRect) => {
@@ -232,6 +235,7 @@ describe('fixed mobile viewport', () => {
     const {
       viewport,
       cancelTouchSelection,
+      cancelTouchScroll,
       setPointerCapture,
     } = makeViewport({stored: 'custom:80x24'});
     viewport.start();
@@ -246,6 +250,7 @@ describe('fixed mobile viewport', () => {
 
     expect(viewport.view.transform).toEqual({x: -100, y: -100, scale: 1});
     expect(cancelTouchSelection).toHaveBeenCalledOnce();
+    expect(cancelTouchScroll).toHaveBeenCalledOnce();
     expect(setPointerCapture).toHaveBeenCalledWith(2);
     expect(second.preventDefault).toHaveBeenCalledOnce();
     expect(second.stopPropagation).toHaveBeenCalledOnce();

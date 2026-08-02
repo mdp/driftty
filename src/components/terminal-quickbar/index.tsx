@@ -179,7 +179,8 @@ export class TerminalQuickbar extends Component<Props, State> {
                       ? tmuxScrollControls
                       : quickbarControls[this.state.mode],
                     onAction,
-                    onControl
+                    onControl,
+                    onText
                   )}
             </div>
           </div>
@@ -252,7 +253,8 @@ export class TerminalQuickbar extends Component<Props, State> {
   private renderControls(
     controls: QuickbarControl[],
     onAction: Props['onAction'],
-    onControl: Props['onControl']
+    onControl: Props['onControl'],
+    onText: Props['onText']
   ) {
     return controls.map((control) =>
       'action' in control ? (
@@ -267,6 +269,19 @@ export class TerminalQuickbar extends Component<Props, State> {
           }
           danger={control.danger}
         />
+      ) : 'text' in control ? (
+        <button
+          key={control.label}
+          type="button"
+          class={`terminal-quickbar__key ${
+            control.danger ? 'terminal-quickbar__key--danger' : ''
+          }`}
+          aria-label={`Send ${control.label} to terminal`}
+          onPointerDown={preventTerminalFocus}
+          onClick={() => onText(control.text)}
+        >
+          {control.label}
+        </button>
       ) : (
         <button
           key={control.label}
