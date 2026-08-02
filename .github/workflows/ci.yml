@@ -38,9 +38,9 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:17681/ | grep -q 'terminal-container'
-      - name: Smoke test OpenCode demo
+      - name: Smoke test coding CLI demo
         run: |
-          id=$(docker run -d -e DRIFTTY_DEMO_AGENT=true -p 17117:7117 driftty-demo:test)
+          id=$(docker run -d -p 17117:7117 driftty-demo:test)
           trap 'docker rm -f "$id"' EXIT
           for attempt in $(seq 1 30); do
             curl -fsS http://127.0.0.1:17117/ >/dev/null && break
@@ -65,9 +65,11 @@ jobs:
           NODE
           docker exec "$id" sh -lc '
             test "$(id -u)" = 1000
-            test -d "$HOME/.local/state/driftty-demo/agent-started"
             tmux has-session -t driftty-demo
             test "$(opencode --version)" = "$OPENCODE_VERSION"
+            test "$(cline --version)" = "$CLINE_VERSION"
+            test "$(tmux list-windows -t driftty-demo -F "#{window_name}" | sort | tr "\\n" " ")" = "Cline OpenCode Readme "
+            test -s /workspace/README.md
           '
       - name: Verify all images contain the same mobile client
         run: |

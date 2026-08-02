@@ -29,24 +29,26 @@ CMD ["sh"]
 FROM generic AS demo
 
 ARG OPENCODE_VERSION=1.18.10
+ARG CLINE_VERSION=3.0.49
 ENV OPENCODE_VERSION=${OPENCODE_VERSION}
+ENV CLINE_VERSION=${CLINE_VERSION}
 
-RUN apk add --no-cache bash git nodejs npm ripgrep tmux \
-    && npm install --global "opencode-ai@${OPENCODE_VERSION}" \
+RUN apk add --no-cache bash git libc6-compat nodejs npm ripgrep tmux \
+    && npm install --global \
+      "opencode-ai@${OPENCODE_VERSION}" \
+      "cline@${CLINE_VERSION}" \
     && npm cache clean --force \
     && adduser -D -s /bin/bash demo \
     && mkdir -p /workspace \
     && chown demo:demo /workspace
 
 COPY docker/demo-entrypoint.sh /usr/local/bin/driftty-demo
-COPY docker/demo-first-login.sh /usr/local/bin/driftty-demo-first-login
 COPY --chown=demo:demo docker/demo.bash_profile /home/demo/.bash_profile
+COPY --chown=demo:demo README.md /workspace/README.md
 RUN chmod 0755 \
-    /usr/local/bin/driftty-demo \
-    /usr/local/bin/driftty-demo-first-login
+    /usr/local/bin/driftty-demo
 
-ENV HOME=/home/demo \
-    DRIFTTY_DEMO_AGENT=opencode
+ENV HOME=/home/demo
 WORKDIR /workspace
 USER demo
 

@@ -25,11 +25,11 @@ a small touchscreen needs.
 - A lightweight footprint. Run it as a single container around any command, or
   add the gateway layer when you need SSH routing.
 
-## Quick start: try it with OpenCode
+## Quick start: try the coding CLI demo
 
-The quickest way to see driftty is the demo image. It opens
-[OpenCode](https://opencode.ai) inside a persistent tmux session, so you can
-drive a coding agent from a phone browser immediately:
+The quickest way to see driftty is the demo image. It opens a persistent tmux
+session with three tabs so you can compare coding agents and test terminal
+scrolling from a phone browser immediately:
 
 ```bash
 docker run --rm \
@@ -37,9 +37,17 @@ docker run --rm \
   ghcr.io/mdp/driftty-demo:edge
 ```
 
-Open <http://localhost:7117>. The first terminal login starts OpenCode; if it
-exits, the pane continues as a Bash shell. Refreshing or reconnecting attaches
-to the same `driftty-demo` tmux session and does not start OpenCode again.
+Open <http://localhost:7117>. If either agent exits, its pane continues as a
+Bash shell. The session starts with these tabs:
+
+- `Cline`: the [Cline](https://cline.bot) terminal coding agent.
+- `OpenCode`: the [OpenCode](https://opencode.ai) terminal coding agent.
+- `Readme`: the project README printed into the terminal for testing scrollback
+  and mobile drag scrolling.
+
+Cline and OpenCode may each ask for provider or account configuration the first
+time they run. Refreshing or reconnecting attaches to the same
+`driftty-demo` tmux session and does not create another set of tabs.
 
 To let OpenCode work on the current directory, mount it as the demo workspace:
 
