@@ -88,7 +88,10 @@ export class Terminal extends Component<Props, State> {
     this.xterm = new Xterm(props);
     this.fixedMobileViewport = new FixedMobileViewport({
       mobile: this.mobileViewer,
-      screen: window.screen,
+      viewportSize: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
       storage: window.localStorage,
       terminal: this.xterm,
       viewport: () => this.viewport,

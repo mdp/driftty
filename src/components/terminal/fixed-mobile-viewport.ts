@@ -51,7 +51,7 @@ interface FixedMobileViewportElement {
 
 interface FixedMobileViewportOptions {
   mobile: boolean;
-  screen: Pick<Screen, 'width' | 'height'>;
+  viewportSize: Pick<DOMRect, 'width' | 'height'>;
   storage: Pick<Storage, 'getItem' | 'setItem'>;
   terminal: FixedMobileViewportTerminal;
   viewport: () => FixedMobileViewportElement | undefined;
@@ -103,7 +103,7 @@ export function fixedTerminalSize(
 
 function loadTerminalViewportSize(
   storage: Pick<Storage, 'getItem' | 'setItem'>,
-  screen: Pick<Screen, 'width' | 'height'>,
+  viewportSize: Pick<DOMRect, 'width' | 'height'>,
 ): TerminalViewportSize {
   try {
     const value = storage.getItem(storageKey);
@@ -125,8 +125,8 @@ function loadTerminalViewportSize(
   } catch {
     // Storage can be unavailable in private or embedded browsing contexts.
   }
-  const shortEdge = Math.min(screen.width, screen.height);
-  const defaultSize = screen.height > screen.width && shortEdge <= 600
+  const shortEdge = Math.min(viewportSize.width, viewportSize.height);
+  const defaultSize = viewportSize.height > viewportSize.width && shortEdge <= 600
     ? '80x60'
     : 'auto';
   saveTerminalViewportSize(storage, defaultSize);
@@ -193,7 +193,7 @@ export class FixedMobileViewport {
 
   constructor({
     mobile,
-    screen,
+    viewportSize,
     storage,
     terminal,
     viewport,
@@ -207,7 +207,7 @@ export class FixedMobileViewport {
     this.onChange = onChange;
     this.schedule = schedule;
     this.currentView = {
-      size: loadTerminalViewportSize(storage, screen),
+      size: loadTerminalViewportSize(storage, viewportSize),
       transform: identityTransform,
     };
   }

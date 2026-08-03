@@ -43,12 +43,12 @@ function makeViewport({
   stored = null,
   mobile = true,
   bounds = viewportBounds(),
-  screen = {width: 1440, height: 900},
+  viewportSize = {width: 1440, height: 900},
 }: {
   stored?: string | null;
   mobile?: boolean;
   bounds?: DOMRect;
-  screen?: {width: number; height: number};
+  viewportSize?: {width: number; height: number};
 } = {}) {
   let currentBounds = bounds;
   const setItem = vi.fn();
@@ -75,7 +75,7 @@ function makeViewport({
       setPointerCapture,
       releasePointerCapture,
     }),
-    screen,
+    viewportSize,
     onChange: (view) => changes.push(view),
     schedule: (callback) => callback(),
   });
@@ -97,7 +97,7 @@ function makeViewport({
 describe('fixed mobile viewport', () => {
   it('defaults a first visit on a phone-like portrait screen to 80 by 60', () => {
     const {viewport, setItem, setFixedSize} = makeViewport({
-      screen: {width: 393, height: 852},
+      viewportSize: {width: 393, height: 852},
     });
 
     viewport.start();
@@ -112,7 +112,7 @@ describe('fixed mobile viewport', () => {
 
   it('defaults a first desktop visit to fit screen', () => {
     const {viewport, setItem, setFixedSize} = makeViewport({
-      screen: {width: 1440, height: 900},
+      viewportSize: {width: 1440, height: 900},
     });
 
     viewport.start();
@@ -125,9 +125,19 @@ describe('fixed mobile viewport', () => {
     expect(setFixedSize).toHaveBeenLastCalledWith();
   });
 
+  it('uses the CSS viewport when device emulation reports a desktop screen', () => {
+    const {viewport} = makeViewport({
+      viewportSize: {width: 393, height: 852},
+    });
+
+    viewport.start();
+
+    expect(viewport.view.size).toBe('80x60');
+  });
+
   it('keeps a first phone visit in landscape fitted to the screen', () => {
     const {viewport} = makeViewport({
-      screen: {width: 852, height: 393},
+      viewportSize: {width: 852, height: 393},
     });
 
     viewport.start();
@@ -137,7 +147,7 @@ describe('fixed mobile viewport', () => {
 
   it('keeps a first portrait tablet visit fitted to the screen', () => {
     const {viewport} = makeViewport({
-      screen: {width: 768, height: 1024},
+      viewportSize: {width: 768, height: 1024},
     });
 
     viewport.start();
@@ -148,7 +158,7 @@ describe('fixed mobile viewport', () => {
   it('preserves a saved size on a phone-like portrait screen', () => {
     const {viewport} = makeViewport({
       stored: '100x30',
-      screen: {width: 393, height: 852},
+      viewportSize: {width: 393, height: 852},
     });
 
     viewport.start();
