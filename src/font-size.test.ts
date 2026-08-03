@@ -3,8 +3,8 @@ import {clampFontSize, fontSizeForViewport} from './font-size';
 
 describe('mobile font sizing', () => {
   it('uses a compact default on phone-sized viewports', () => {
-    expect(fontSizeForViewport(390, 844, true)).toBe(12);
-    expect(fontSizeForViewport(844, 390, true)).toBe(12);
+    expect(fontSizeForViewport(390, 844, true)).toBe(10);
+    expect(fontSizeForViewport(844, 390, true)).toBe(10);
   });
 
   it('keeps user font adjustments within readable bounds', () => {

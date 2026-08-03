@@ -17,7 +17,7 @@ export function fontSizeForViewport(
 
   const isPortrait = height > width;
   const shortEdge = Math.min(width, height);
-  if (shortEdge <= 480) return 12;
+  if (shortEdge <= 480) return 10;
   if (shortEdge <= 768) return 13;
   if (shortEdge <= 1024) return 13;
   return DEFAULT_FONT_SIZE;
