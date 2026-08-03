@@ -16,7 +16,12 @@ a small touchscreen needs.
 
 <p align="center">
   <img
-    width="304"
+    width="300"
+    alt="driftty mobile terminal with keyboard"
+    src="https://github.com/user-attachments/assets/ffbc52af-e26e-4ec1-bdf8-34a179660e4f"
+  />
+  <img
+    width="300"
     alt="driftty mobile terminal"
     src="https://github.com/user-attachments/assets/1d2a7ecd-a6b2-47cd-be90-941fe1783bea"
   />
