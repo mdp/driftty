@@ -676,8 +676,9 @@ export class Terminal extends Component<Props, State> {
   private handleViewportChange = () => {
     const viewport = window.visualViewport;
     const currentWidth = window.innerWidth;
+    const widthChanged = currentWidth !== this.layoutWidth;
 
-    if (Math.abs(currentWidth - this.layoutWidth) > 50) {
+    if (widthChanged) {
       this.layoutWidth = currentWidth;
       this.layoutHeight = window.innerHeight;
     }
@@ -691,6 +692,7 @@ export class Terminal extends Component<Props, State> {
         },
         () => {
           this.xterm.fit();
+          if (widthChanged) this.fixedMobileViewport.resize();
           this.settleTerminalLayout();
         }
       );
@@ -724,6 +726,7 @@ export class Terminal extends Component<Props, State> {
       () => {
         requestAnimationFrame(() => {
           this.xterm.fit();
+          if (widthChanged) this.fixedMobileViewport.resize();
           if (keyboardChanged) {
             if (measurement.keyboardOpen) {
               this.xterm.scrollToBottom();

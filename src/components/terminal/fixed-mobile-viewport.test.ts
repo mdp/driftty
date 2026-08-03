@@ -193,6 +193,23 @@ describe('fixed mobile viewport', () => {
     expect(setFixedSize).toHaveBeenLastCalledWith();
   });
 
+  it('reflows a fixed surface when the viewport width changes', () => {
+    const {viewport, setBounds} = makeViewport({
+      stored: '80x60',
+      bounds: viewportBounds(1440, 900),
+    });
+
+    viewport.start();
+    setBounds(viewportBounds(393, 852));
+    viewport.resize();
+
+    expect(viewport.view.transform).toEqual({
+      x: 0,
+      y: 131.25,
+      scale: 0.6140625,
+    });
+  });
+
   it('migrates the old 80 by 24 mobile preset to 80 by 60', () => {
     const {viewport, setFixedSize} = makeViewport({stored: '80x24'});
 

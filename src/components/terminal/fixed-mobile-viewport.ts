@@ -226,6 +226,16 @@ export class FixedMobileViewport {
     this.applySize(this.currentView.size);
   }
 
+  resize(): void {
+    const element = this.viewport();
+    const surface = this.currentView.surface;
+    if (!element || !surface || this.currentView.size === 'auto') return;
+    this.update({
+      ...this.currentView,
+      transform: fitTransform(element.getBoundingClientRect(), surface),
+    });
+  }
+
   select(size: TerminalViewportSize): void {
     saveTerminalViewportSize(this.storage, size);
     this.applySize(size);
