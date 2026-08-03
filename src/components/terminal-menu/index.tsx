@@ -8,6 +8,7 @@ import {
   terminalViewportSizes,
   type TerminalViewportSize,
 } from '../terminal/fixed-mobile-viewport';
+import {MAX_FONT_SIZE, MIN_FONT_SIZE} from '../../font-size';
 import './terminal-menu.scss';
 
 interface Props {
@@ -27,6 +28,8 @@ interface Props {
   onToggleAutoReconnect: () => void;
   terminalViewportSize?: TerminalViewportSize;
   onTerminalViewportSizeChange?: (size: TerminalViewportSize) => void;
+  fontSize?: number;
+  onFontSizeChange?: (size: number) => void;
 }
 
 export class TerminalMenu extends Component<Props> {
@@ -74,6 +77,8 @@ export class TerminalMenu extends Component<Props> {
     onToggleAutoReconnect,
     terminalViewportSize = 'auto',
     onTerminalViewportSizeChange,
+    fontSize,
+    onFontSizeChange,
   }: Props) {
     const identity = terminalIdentity(window.location.pathname);
     const connectionLabel =
@@ -296,6 +301,30 @@ export class TerminalMenu extends Component<Props> {
                   ? 'Fixed sizes support two-finger pan, pinch zoom, and double-tap to fit.'
                   : 'Fixed sizes preserve the selected TTY geometry; double-click to fit.'}
               </p>
+            </fieldset>
+          )}
+          {fontSize !== undefined && onFontSizeChange && (
+            <fieldset class="terminal-menu__font-size">
+              <legend>Font size</legend>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => onFontSizeChange(fontSize - 1)}
+                  disabled={fontSize <= MIN_FONT_SIZE}
+                  aria-label="Decrease terminal font size"
+                >
+                  A-
+                </button>
+                <output aria-live="polite">{fontSize}px</output>
+                <button
+                  type="button"
+                  onClick={() => onFontSizeChange(fontSize + 1)}
+                  disabled={fontSize >= MAX_FONT_SIZE}
+                  aria-label="Increase terminal font size"
+                >
+                  A+
+                </button>
+              </div>
             </fieldset>
           )}
           <button type="button" onClick={onOpenKeyboard}>

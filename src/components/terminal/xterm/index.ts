@@ -189,6 +189,12 @@ export class Xterm {
     this.fit();
   }
 
+  public setFontSize(size: number) {
+    if (!this.terminal) return;
+    this.terminal.options.fontSize = size;
+    this.fit();
+  }
+
   public cellSize() {
     const screen = this.terminal?.element?.querySelector(
       '.xterm-screen'
@@ -580,7 +586,7 @@ export class Xterm {
     let scrolling = false;
 
     const reset = () => {
-      if (pointerId !== undefined) {
+      if (scrolling && pointerId !== undefined) {
         element.releasePointerCapture?.(pointerId);
       }
       pointerId = undefined;

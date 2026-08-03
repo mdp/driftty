@@ -56,6 +56,7 @@ function makeViewport({
   const cancelTouchSelection = vi.fn();
   const cancelTouchScroll = vi.fn();
   const setPointerCapture = vi.fn();
+  const releasePointerCapture = vi.fn();
   const changes: FixedMobileViewportView[] = [];
   const viewport = new FixedMobileViewport({
     mobile,
@@ -72,6 +73,7 @@ function makeViewport({
     viewport: () => ({
       getBoundingClientRect: () => currentBounds,
       setPointerCapture,
+      releasePointerCapture,
     }),
     screen,
     onChange: (view) => changes.push(view),
@@ -84,6 +86,7 @@ function makeViewport({
     cancelTouchSelection,
     cancelTouchScroll,
     setPointerCapture,
+    releasePointerCapture,
     changes,
     setBounds: (nextBounds: DOMRect) => {
       currentBounds = nextBounds;
@@ -251,9 +254,57 @@ describe('fixed mobile viewport', () => {
     expect(viewport.view.transform).toEqual({x: -100, y: -100, scale: 1});
     expect(cancelTouchSelection).toHaveBeenCalledOnce();
     expect(cancelTouchScroll).toHaveBeenCalledOnce();
+    expect(setPointerCapture).toHaveBeenCalledWith(1);
     expect(setPointerCapture).toHaveBeenCalledWith(2);
     expect(second.preventDefault).toHaveBeenCalledOnce();
     expect(second.stopPropagation).toHaveBeenCalledOnce();
+  });
+
+  it('transfers both pointers from scrolling to pinch ownership', () => {
+    const {viewport, cancelTouchScroll, setPointerCapture} = makeViewport({
+      stored: 'custom:80x24',
+    });
+    viewport.start();
+
+    viewport.handlePointer(
+      pointerEvent({id: 1, type: 'pointerdown', x: 100, y: 100}),
+    );
+    viewport.handlePointer(
+      pointerEvent({id: 1, type: 'pointermove', x: 100, y: 60}),
+    );
+    viewport.handlePointer(
+      pointerEvent({id: 2, type: 'pointerdown', x: 200, y: 100}),
+    );
+
+    expect(cancelTouchScroll).toHaveBeenCalledOnce();
+    expect(setPointerCapture).toHaveBeenNthCalledWith(1, 1);
+    expect(setPointerCapture).toHaveBeenNthCalledWith(2, 2);
+
+    viewport.handlePointer(
+      pointerEvent({id: 1, type: 'pointermove', x: 80, y: 40}),
+    );
+    viewport.handlePointer(
+      pointerEvent({id: 2, type: 'pointermove', x: 240, y: 160}),
+    );
+    expect(viewport.view.transform.scale).toBeGreaterThan(0.5);
+  });
+
+  it('releases the remaining pointer when pinch ownership ends', () => {
+    const {viewport, releasePointerCapture} = makeViewport({
+      stored: 'custom:80x24',
+    });
+    viewport.start();
+    viewport.handlePointer(
+      pointerEvent({id: 1, type: 'pointerdown', x: 100, y: 100}),
+    );
+    viewport.handlePointer(
+      pointerEvent({id: 2, type: 'pointerdown', x: 200, y: 100}),
+    );
+    viewport.handlePointer(
+      pointerEvent({id: 1, type: 'pointerup', x: 100, y: 100}),
+    );
+
+    expect(releasePointerCapture).toHaveBeenCalledWith(2);
   });
 
   it('fits a pinched surface on mobile double-tap', () => {

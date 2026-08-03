@@ -46,6 +46,7 @@ interface FixedMobileViewportElement {
     'left' | 'top' | 'width' | 'height'
   >;
   setPointerCapture?(pointerId: number): void;
+  releasePointerCapture?(pointerId: number): void;
 }
 
 interface FixedMobileViewportOptions {
@@ -187,7 +188,6 @@ export class FixedMobileViewport {
   private currentView: FixedMobileViewportView;
   private pointers = new Map<number, ViewportPointer>();
   private lastTap?: {time: number; x: number; y: number};
-  private gestureUsed = false;
   private gesture?: ViewportGesture;
   private transformBeforeKeyboard?: TerminalTransform;
 
@@ -338,13 +338,12 @@ export class FixedMobileViewport {
       startY: event.clientY,
     });
     if (this.pointers.size !== 2) return;
-    this.gestureUsed = true;
     this.lastTap = undefined;
     event.preventDefault();
     event.stopPropagation();
     this.terminal.cancelTouchSelection();
     this.terminal.cancelTouchScroll();
-    this.viewport()?.setPointerCapture?.(event.pointerId);
+    this.captureActivePointers();
     const [first, second] = [...this.pointers.values()];
     const center = {
       x: (first.x + second.x) / 2,
@@ -418,9 +417,11 @@ export class FixedMobileViewport {
 
   private pointerEnd(event: PointerEvent): void {
     const pointer = this.pointers.get(event.pointerId);
-    const wasGesture = this.gestureUsed;
+    const wasGesture = Boolean(this.gesture);
     this.pointers.delete(event.pointerId);
-    if (this.pointers.size < 2) this.gesture = undefined;
+    if (this.pointers.size < 2) {
+      this.releaseActivePointers();
+    }
     if (
       pointer &&
       !wasGesture &&
@@ -448,7 +449,21 @@ export class FixedMobileViewport {
         };
       }
     }
-    if (this.pointers.size === 0) this.gestureUsed = false;
+    if (this.pointers.size === 0) this.gesture = undefined;
+  }
+
+  private captureActivePointers(): void {
+    const viewport = this.viewport();
+    for (const pointerId of this.pointers.keys()) {
+      viewport?.setPointerCapture?.(pointerId);
+    }
+  }
+
+  private releaseActivePointers(): void {
+    const viewport = this.viewport();
+    for (const pointerId of this.pointers.keys()) {
+      viewport?.releasePointerCapture?.(pointerId);
+    }
   }
 
   private fit(): boolean {

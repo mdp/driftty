@@ -160,4 +160,38 @@ describe('mobile touch selection', () => {
     expect(element.releasePointerCapture).toHaveBeenCalledWith(1);
     xterm.dispose();
   });
+
+  it('does not release capture before a drag has claimed it', () => {
+    vi.stubGlobal('document', {
+      createElement: () =>
+        Object.assign(new EventTarget(), {
+          style: {},
+        }),
+    });
+    const element = new EventTarget() as EventTarget & {
+      querySelector: () => null;
+      setPointerCapture: (pointerId: number) => void;
+      releasePointerCapture: (pointerId: number) => void;
+    };
+    element.querySelector = () => null;
+    element.setPointerCapture = vi.fn();
+    element.releasePointerCapture = vi.fn();
+
+    const xterm = new Xterm(mobileOptions());
+    (
+      xterm as unknown as {
+        terminal: {element: typeof element; cols: number; rows: number};
+        initTouchScroll: () => void;
+      }
+    ).terminal = {element, cols: 80, rows: 24};
+    (
+      xterm as unknown as {initTouchScroll: () => void}
+    ).initTouchScroll();
+
+    element.dispatchEvent(touchEvent('pointerdown', 1, 100, 160));
+    element.dispatchEvent(touchEvent('pointercancel', 1, 100, 160));
+
+    expect(element.releasePointerCapture).not.toHaveBeenCalled();
+    xterm.dispose();
+  });
 });

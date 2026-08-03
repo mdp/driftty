@@ -36,7 +36,9 @@ function createSessionControl(
     <form method="post" action="/${profile.slug}/sessions">
       <label for="new-shell-${profile.slug}">Shell name</label>
       <input id="new-shell-${profile.slug}" name="name" value="${escapeHtml(suggestedName)}"
-        pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxlength="64" required autocomplete="off">
+        pattern="[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*" maxlength="64" required autocomplete="off"
+        autocapitalize="none" onfocus="this.select()"
+        oninput="this.value=this.value.toLowerCase().replace(/\\s+/g,'-')">
       <button type="submit">Create</button>
     </form>
   </details>`;

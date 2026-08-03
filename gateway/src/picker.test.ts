@@ -58,6 +58,8 @@ describe('host picker', () => {
     expect(body).toContain('action="/monaco-shells/sessions"');
     expect(body).toContain('name="name"');
     expect(body).toContain('value="bold-wu"');
+    expect(body).toContain('onfocus="this.select()"');
+    expect(body).toContain("toLowerCase().replace(/\\s+/g,'-')");
     expect(body).not.toContain('>Monaco shells<');
   });
 

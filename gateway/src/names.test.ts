@@ -11,10 +11,15 @@ describe('session names', () => {
     expect(sessionSlug('  my-debug-shell  ')).toBe('my-debug-shell');
   });
 
-  test.each(['My Shell', 'my_shell', '-shell', 'shell-', ''])(
+  test('normalizes capitals and spaces into a URL-safe shell name', () => {
+    expect(sessionSlug('My New Shell')).toBe('my-new-shell');
+    expect(sessionSlug('  mixed   spacing ')).toBe('mixed-spacing');
+  });
+
+  test.each(['my_shell', '-shell', 'shell-', ''])(
     'rejects invalid chosen shell name %s',
     (name) => {
-      expect(() => sessionSlug(name)).toThrow('lowercase letters');
+      expect(() => sessionSlug(name)).toThrow('letters, numbers');
     },
   );
 });

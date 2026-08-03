@@ -217,6 +217,42 @@ $muted: #66858c;
     }
   }
 
+  &__font-size {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    legend {
+      width: 100%;
+      margin-bottom: 5px;
+      color: $muted;
+      font-size: 10px;
+    }
+
+    > div {
+      display: grid;
+      grid-template-columns: 1fr minmax(72px, auto) 1fr;
+      gap: 5px;
+      align-items: center;
+    }
+
+    button {
+      justify-content: center !important;
+      min-height: 42px !important;
+      padding: 8px !important;
+      text-align: center !important;
+    }
+
+    output {
+      color: $cyan;
+      font-size: 12px;
+      text-align: center;
+    }
+  }
+
   &__custom-size {
     display: grid;
     grid-template-columns: minmax(72px, 1fr) 70px auto 70px auto;

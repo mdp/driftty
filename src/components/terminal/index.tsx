@@ -36,6 +36,7 @@ import {
   type TerminalUiState,
   type TerminalSurface,
 } from './ui-state';
+import {clampFontSize, FONT_SIZE_STORAGE_KEY} from '../../font-size';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -58,6 +59,7 @@ interface State {
   ctrlArmed: boolean;
   touchSelection: TouchSelectionState;
   fixedViewport: FixedMobileViewportView;
+  fontSize: number;
 }
 
 export class Terminal extends Component<Props, State> {
@@ -110,6 +112,7 @@ export class Terminal extends Component<Props, State> {
       ctrlArmed: false,
       touchSelection: {status: 'idle'},
       fixedViewport: this.fixedMobileViewport.view,
+      fontSize: props.termOptions.fontSize ?? 13,
     };
   }
 
@@ -350,6 +353,8 @@ export class Terminal extends Component<Props, State> {
             onToggleAutoReconnect={this.toggleAutoReconnect}
             terminalViewportSize={terminalViewportSize}
             onTerminalViewportSizeChange={this.setTerminalViewportSize}
+            fontSize={this.state.fontSize}
+            onFontSizeChange={this.setFontSize}
           />
         )}
         {this.mobileViewer &&
@@ -642,6 +647,19 @@ export class Terminal extends Component<Props, State> {
   @bind
   setTerminalViewportSize(terminalViewportSize: TerminalViewportSize) {
     this.fixedMobileViewport.select(terminalViewportSize);
+  }
+
+  @bind
+  setFontSize(size: number) {
+    const fontSize = clampFontSize(size);
+    this.xterm.setFontSize(fontSize);
+    this.fixedMobileViewport.select(this.state.fixedViewport.size);
+    this.setState({fontSize});
+    try {
+      localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(fontSize));
+    } catch {
+      // Storage can be disabled in privacy-focused browsers.
+    }
   }
 
   private handleFixedViewportPointer = (event: PointerEvent) => {

@@ -17,10 +17,10 @@ export function randomSessionName(random = Math.random): string {
 }
 
 export function sessionSlug(value: string): string {
-  const slug = value.trim();
+  const slug = value.trim().toLowerCase().replace(/\s+/g, '-');
   if (slug.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
     throw new Error(
-      'shell name must use lowercase letters, numbers, and single hyphens (64 characters max)',
+      'shell name must use letters, numbers, and single hyphens (64 characters max)',
     );
   }
   return slug;
