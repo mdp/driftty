@@ -14,6 +14,14 @@ a phone browser. It builds on [ttyd](https://github.com/tsl0922/ttyd) and adds
 the controls, viewport behavior, and connection handling that terminal work on
 a small touchscreen needs.
 
+<p align="center">
+  <img
+    width="304"
+    alt="driftty mobile terminal"
+    src="https://github.com/user-attachments/assets/1d2a7ecd-a6b2-47cd-be90-941fe1783bea"
+  />
+</p>
+
 **Goals:**
 
 - One mobile terminal experience, no matter how driftty is run. The gateway
