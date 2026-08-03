@@ -81,6 +81,12 @@ The demo endpoint has no authentication. Keep the published port bound to
 
 ## Installation: install the SSH gateway
 
+> **Alpha software and security warning:** driftty is very early-stage software.
+> The gateway does **not** provide authentication or access control. The person
+> operating it is responsible for putting it behind an authenticated tunnel,
+> reverse proxy, VPN, or other trusted access boundary before exposing it to a
+> network. Do not publish the gateway directly to the internet.
+
 For real, long-lived access to your own shells, install the gateway. Download
 the gateway bundle from the latest GitHub release, unpack it, and run:
 
@@ -209,6 +215,11 @@ The image enables writable input and embeds the complete client at
 `/usr/share/ttyd/index.html`.
 
 ### Connection and security model
+
+The gateway does not handle authentication. Authentication and access policy
+are entirely the responsibility of the operator and must be enforced by the
+tunnel or reverse-proxy layer in front of it. Treat the gateway as an internal
+service, not as a public internet-facing application.
 
 Each browser connection gets a separate SSH process. Session-routed
 connections attach that process to the selected tmux session.
