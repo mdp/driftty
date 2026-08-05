@@ -33,10 +33,31 @@ ARG CLINE_VERSION=3.0.49
 ENV OPENCODE_VERSION=${OPENCODE_VERSION}
 ENV CLINE_VERSION=${CLINE_VERSION}
 
+# Avoid executing the OpenCode binary while Buildx emulates ARM64.
 RUN apk add --no-cache bash git libc6-compat nodejs npm ripgrep tmux \
-    && npm install --global \
+    && npm install --global --ignore-scripts \
       "opencode-ai@${OPENCODE_VERSION}" \
       "cline@${CLINE_VERSION}" \
+    && global_node_modules="$(npm root --global)" \
+    && opencode_root="${global_node_modules}/opencode-ai" \
+    && case "$(uname -m)" in \
+      aarch64) opencode_packages="opencode-linux-arm64-musl opencode-linux-arm64" ;; \
+      x86_64) \
+        if grep -qE '(^|[[:space:]])avx2([[:space:]]|$)' /proc/cpuinfo; then \
+          opencode_packages="opencode-linux-x64-musl opencode-linux-x64"; \
+        else \
+          opencode_packages="opencode-linux-x64-baseline-musl opencode-linux-x64-musl opencode-linux-x64-baseline opencode-linux-x64"; \
+        fi ;; \
+      *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;; \
+    esac \
+    && for opencode_package in ${opencode_packages}; do \
+      if [ -f "${opencode_root}/node_modules/${opencode_package}/bin/opencode" ]; then \
+        cp "${opencode_root}/node_modules/${opencode_package}/bin/opencode" "${opencode_root}/bin/opencode.exe"; \
+        break; \
+      fi; \
+    done \
+    && test -f "${opencode_root}/bin/opencode.exe" \
+    && chmod 0755 "${opencode_root}/bin/opencode.exe" \
     && npm cache clean --force \
     && adduser -D -s /bin/bash demo \
     && mkdir -p /workspace \
