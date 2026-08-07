@@ -39,7 +39,8 @@ const clientOptions = {
 const viewer = detectViewerProfile();
 const termOptions = {
   fontSize: initialFontSize(viewer),
-  fontFamily: 'Consolas,Liberation Mono,Menlo,Courier,monospace',
+  fontFamily:
+    '"JetBrains Mono Nerd Font", ui-monospace, SFMono-Regular, Menlo, monospace',
   theme: {
     foreground: '#d8f3e8',
     background: '#05080b',

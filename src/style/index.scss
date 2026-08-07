@@ -7,6 +7,14 @@ body {
   background: #05080b;
 }
 
+@font-face {
+  font-family: 'JetBrains Mono Nerd Font';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('./webfont/JetBrainsMonoNerdFont-Regular.woff2') format('woff2');
+}
+
 .terminal-shell {
   position: absolute;
   top: 0;
