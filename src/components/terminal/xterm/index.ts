@@ -24,6 +24,7 @@ import {
 } from '../../../touch-input';
 import type {ViewerProfile} from '../../../viewer-profile';
 import {selectionRange, terminalCellAt} from '../../../desktop-selection';
+import {cleanCopyText} from '../../../copy-text';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -112,9 +113,10 @@ function addEventListener(
   target: EventTarget,
   type: string,
   listener: EventListener,
+  options?: AddEventListenerOptions | boolean,
 ): IDisposable {
-  target.addEventListener(type, listener);
-  return toDisposable(() => target.removeEventListener(type, listener));
+  target.addEventListener(type, listener, options);
+  return toDisposable(() => target.removeEventListener(type, listener, options));
 }
 
 export class Xterm {
@@ -309,7 +311,7 @@ export class Xterm {
   public async copyTouchSelection() {
     if (!this.touchSelectionText) return;
     try {
-      await navigator.clipboard.writeText(this.touchSelectionText);
+      await navigator.clipboard.writeText(cleanCopyText(this.touchSelectionText));
     } catch {
       return;
     }
@@ -434,6 +436,15 @@ export class Xterm {
 
     terminal.attachCustomKeyEventHandler((event) => {
       if (
+        event.key.toLowerCase() === 'x' &&
+        (event.ctrlKey || event.metaKey) &&
+        event.altKey &&
+        !event.shiftKey
+      ) {
+        if (event.type === 'keydown') this.armTouchSelection();
+        return false;
+      }
+      if (
         event.key !== 'Enter' ||
         !event.shiftKey ||
         event.ctrlKey ||
@@ -452,6 +463,7 @@ export class Xterm {
     terminal.open(parent);
     this.applyNativeInputState();
     this.initDesktopSelection();
+    this.initDesktopRectangleSelection();
     this.initTouchSelection();
     this.initTouchScroll();
     fitAddon.fit();
@@ -719,7 +731,7 @@ export class Xterm {
     };
     const mouseDown = (rawEvent: Event) => {
       const event = rawEvent as MouseEvent;
-      if (event.button !== 0 || !event.shiftKey) return;
+      if (event.button !== 0 || !event.shiftKey || event.altKey) return;
       const cell = cellAt(event);
       if (!cell) return;
       event.preventDefault();
@@ -731,6 +743,117 @@ export class Xterm {
       document.addEventListener('mouseup', mouseUp, true);
     };
 
+    element.addEventListener('mousedown', mouseDown, true);
+    this.selectionGestureDisposables.push(toDisposable(() => {
+      element.removeEventListener('mousedown', mouseDown, true);
+      document.removeEventListener('mousemove', mouseMove, true);
+      document.removeEventListener('mouseup', mouseUp, true);
+    }));
+  }
+
+  private initDesktopRectangleSelection() {
+    if (this.mobileViewer || !this.terminal.element) return;
+    const element = this.terminal.element;
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    let selecting = false;
+    let armed = false;
+
+    const screenBounds = () =>
+      (element.querySelector('.xterm-screen') as HTMLElement | null)
+        ?.getBoundingClientRect();
+    const clampPoint = (x: number, y: number) => {
+      const bounds = screenBounds();
+      if (!bounds) return;
+      return {
+        x: Math.min(bounds.right, Math.max(bounds.left, x)),
+        y: Math.min(bounds.bottom, Math.max(bounds.top, y)),
+      };
+    };
+    const reportBox = (status: 'selecting' | 'complete') => {
+      const start = clampPoint(startX, startY);
+      const current = clampPoint(currentX, currentY);
+      if (!start || !current) return;
+      this.touchSelectionListener?.({
+        status,
+        box: {
+          left: Math.min(start.x, current.x),
+          top: Math.min(start.y, current.y),
+          width: Math.max(2, Math.abs(current.x - start.x)),
+          height: Math.max(2, Math.abs(current.y - start.y)),
+        },
+        copyAvailable:
+          status === 'complete' && Boolean(this.touchSelectionText),
+      });
+    };
+    const reset = () => {
+      armed = false;
+      selecting = false;
+      this.touchSelectionText = '';
+      this.touchSelectionListener?.({status: 'idle'});
+    };
+    const arm = () => {
+      armed = true;
+      selecting = false;
+      this.touchSelectionText = '';
+      this.touchSelectionListener?.({status: 'armed'});
+    };
+    const mouseMove = (rawEvent: Event) => {
+      const event = rawEvent as MouseEvent;
+      if (!selecting) return;
+      event.preventDefault();
+      event.stopPropagation();
+      currentX = event.clientX;
+      currentY = event.clientY;
+      reportBox('selecting');
+    };
+    const mouseUp = (rawEvent: Event) => {
+      const event = rawEvent as MouseEvent;
+      if (!selecting || event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      currentX = event.clientX;
+      currentY = event.clientY;
+      this.touchSelectionText = this.textInsideBox(
+        startX,
+        startY,
+        currentX,
+        currentY,
+      );
+      if (this.touchSelectionText) reportBox('complete');
+      else reset();
+      selecting = false;
+      document.removeEventListener('mousemove', mouseMove, true);
+      document.removeEventListener('mouseup', mouseUp, true);
+    };
+    const mouseDown = (rawEvent: Event) => {
+      const event = rawEvent as MouseEvent;
+      if (
+        event.button !== 0 ||
+        !(armed || (event.altKey && event.shiftKey)) ||
+        !screenBounds()
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      startX = event.clientX;
+      startY = event.clientY;
+      currentX = startX;
+      currentY = startY;
+      armed = false;
+      selecting = true;
+      this.touchSelectionText = '';
+      this.terminal.clearSelection();
+      reportBox('selecting');
+      document.addEventListener('mousemove', mouseMove, true);
+      document.addEventListener('mouseup', mouseUp, true);
+    };
+
+    this.armTouchGesture = arm;
+    this.cancelTouchGesture = reset;
     element.addEventListener('mousedown', mouseDown, true);
     this.selectionGestureDisposables.push(toDisposable(() => {
       element.removeEventListener('mousedown', mouseDown, true);
@@ -773,12 +896,33 @@ export class Xterm {
         line?.translateToString(true, firstColumn, lastColumn + 1) ?? '',
       );
     }
-    return lines.join('\n').replace(/\s+$/g, '');
+    return cleanCopyText(lines.join('\n'));
   }
 
   @bind
   private initListeners() {
     const { terminal, fitAddon, overlayAddon, register, sendData } = this;
+    register(
+      addEventListener(
+        document,
+        'copy',
+        ((rawEvent: Event) => {
+          const event = rawEvent as ClipboardEvent;
+          const target = event.target;
+          if (
+            !(target instanceof Node) ||
+            !this.terminal.element?.contains(target)
+          ) {
+            return;
+          }
+          const selection = this.terminal.getSelection();
+          if (!selection || !event.clipboardData) return;
+          event.preventDefault();
+          event.clipboardData.setData('text/plain', cleanCopyText(selection));
+        }) as EventListener,
+        true,
+      ),
+    );
     register(
       terminal.onTitleChange((data) => {
         if (data && data !== '' && !this.titleFixed) {

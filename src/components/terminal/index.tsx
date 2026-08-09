@@ -348,6 +348,7 @@ export class Terminal extends Component<Props, State> {
             onClose={this.closeTerminalMenu}
             onControl={this.sendControl}
             onOpenComposer={this.openComposer}
+            onStartCopySelection={this.startCopySelection}
             onOpenKeyboard={this.openKeyboard}
             onReconnect={this.reconnect}
             onResetQuickbar={this.resetQuickbar}
