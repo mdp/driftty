@@ -80,7 +80,8 @@ export function authResponse(
 ): Response {
   const forwardedPath = request.headers.get('x-forwarded-uri') ?? '/';
   if (!authEnabled(auth) || isAuthenticated(request, auth) ||
-    forwardedPath === '/' || forwardedPath.startsWith('/login')) {
+    forwardedPath === '/' || forwardedPath.startsWith('/login') ||
+    forwardedPath.startsWith('/watch/') || forwardedPath === '/_health') {
     return new Response(null, {status: 204});
   }
   return new Response('Authentication required', {

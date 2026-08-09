@@ -8,7 +8,7 @@ services:
       - ./keys:/keys:ro
       - known-hosts:/known-hosts
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:7681/"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:7681/_health"]
       interval: 10s
       timeout: 3s
       retries: 5

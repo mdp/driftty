@@ -17,6 +17,7 @@ import {
 import {sshCommand, SshConnection} from './ssh';
 import {authResponse, isAuthenticated, loginResponse, logoutResponse} from './auth';
 import {WatchHub, watchPage} from './watch';
+import {randomSessionName} from './names';
 import {
   TerminalRoutes,
   type RemoteTerminalTarget,
