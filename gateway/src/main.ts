@@ -15,6 +15,8 @@ import {
   type RemoteShellSnapshot,
 } from './remote-shell-registry';
 import {sshCommand, SshConnection} from './ssh';
+import {authResponse, isAuthenticated, loginResponse, logoutResponse} from './auth';
+import {WatchHub, watchPage} from './watch';
 import {
   TerminalRoutes,
   type RemoteTerminalTarget,
@@ -42,6 +44,7 @@ const terminalRoutes = new TerminalRoutes({
   startPort: ttydStartPort,
   onFatal: stop,
 });
+const watchHub = new WatchHub();
 
 function terminalTarget(
   instruction: RemoteShellRegistryPlan,
@@ -103,8 +106,34 @@ for (const instruction of plan.registries) {
 const picker = Bun.serve({
   hostname: '127.0.0.1',
   port: pickerPort,
+  websocket: {
+    open: watchHub.open.bind(watchHub),
+    message: watchHub.message.bind(watchHub),
+    close: watchHub.close.bind(watchHub),
+  },
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === '/_auth') {
+      return authResponse(request, plan.auth);
+    }
+    if (url.pathname === '/login') return loginResponse(request, plan.auth);
+    if (url.pathname === '/logout') return logoutResponse();
+    if (url.pathname === '/_health') return new Response('ok');
+
+    if (url.pathname.startsWith('/watch/')) {
+      const parts = url.pathname.split('/').filter(Boolean);
+      const route = parts.slice(1, 3).join('/');
+      const instruction = plan.get(parts[1]!);
+      if (!instruction || instruction.kind !== 'registry' ||
+        !instruction.view.publicWatch) {
+        return new Response('Not found', {status: 404});
+      }
+      if (parts[3] === 'stream' || parts[3] === 'publish') {
+        const kind = parts[3] === 'publish' ? 'writer' : 'viewer';
+        return watchHub.upgrade(request, route, kind, plan.auth, picker);
+      }
+      return watchPage(route);
+    }
     if (url.pathname === '/') {
       if (request.method !== 'GET') {
         return new Response('Method not allowed', {status: 405});
@@ -126,12 +155,17 @@ const picker = Bun.serve({
           sessionsByProfile.set(instruction.view.slug, registry.unavailable());
         }
       }));
-      return pickerResponse(plan.views, sessionsByProfile);
+      const authenticated = isAuthenticated(request, plan.auth);
+      const views = authenticated
+        ? plan.views
+        : plan.views.filter((view) => view.publicWatch);
+      return pickerResponse(views, sessionsByProfile, randomSessionName, !authenticated);
     }
 
     const parts = url.pathname.split('/').filter(Boolean);
     const instruction = parts[0] ? plan.get(parts[0]) : undefined;
-    if (!instruction || instruction.kind !== 'registry') {
+    if (!instruction || instruction.kind !== 'registry' ||
+      (!isAuthenticated(request, plan.auth) && !instruction.view.publicWatch)) {
       return new Response('Not found', {status: 404});
     }
     const registry = registries.get(instruction.view.slug)!;
@@ -182,6 +216,9 @@ const picker = Bun.serve({
           await terminalRoutes.ensureSession(
             terminalTarget(instruction, registry, shell),
           );
+          if (!isAuthenticated(request, plan.auth)) {
+            return watchPage(`${instruction.view.slug}/${parts[1]}`);
+          }
           return terminalRoutes.clientResponse();
         }
         return Response.redirect(

@@ -8,6 +8,14 @@ const profile = (slug: string, port: number): LegacyRoute => ({
 });
 
 describe('generated Caddy configuration', () => {
+  test('authenticates terminal traffic while leaving watch pages public', () => {
+    const config = caddyConfig([], []);
+    expect(config).toContain('handle /watch/*');
+    expect(config).toContain('forward_auth 127.0.0.1:7799');
+    expect(config).toContain('uri /_auth');
+    expect(config).toContain('handle /_health');
+  });
+
   test('routes prefixed HTTP, token, and websocket requests without stripping paths', () => {
     const config = caddyConfig([profile('baz', 7800), profile('qux', 7801)], []);
     expect(config).toContain('handle /baz/*');

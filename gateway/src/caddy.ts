@@ -41,6 +41,25 @@ export function caddyConfig(
 }
 
 http://:7681 {
+\thandle /_health {
+\t\treverse_proxy 127.0.0.1:${pickerPort}
+\t}
+
+\thandle /login* {
+\t\treverse_proxy 127.0.0.1:${pickerPort}
+\t}
+
+\thandle /logout* {
+\t\treverse_proxy 127.0.0.1:${pickerPort}
+\t}
+
+\thandle /watch/* {
+\t\treverse_proxy 127.0.0.1:${pickerPort}
+\t}
+
+\tforward_auth 127.0.0.1:${pickerPort} {
+\t\turi /_auth
+\t}
 ${sessions}
 ${legacy}
 

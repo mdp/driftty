@@ -52,7 +52,11 @@ function profileCard(profile: GatewayProfileView, index: number): string {
   </a>`;
 }
 
-function sessionCard(profile: GatewayProfileView, session: RemoteShell): string {
+function sessionCard(
+  profile: GatewayProfileView,
+  session: RemoteShell,
+  watchOnly = false,
+): string {
   const date = session.created
     ? new Date(session.created * 1000).toLocaleString('en-CA', {
       year: 'numeric', month: '2-digit', day: '2-digit',
@@ -62,7 +66,10 @@ function sessionCard(profile: GatewayProfileView, session: RemoteShell): string 
   const status = session.attached > 0
     ? `attached ×${session.attached}`
     : 'detached';
-  return `<a class="session" href="/${profile.slug}/${session.slug}/">
+  const href = watchOnly && profile.publicWatch
+    ? `/watch/${profile.slug}/${session.slug}/`
+    : `/${profile.slug}/${session.slug}/`;
+  return `<a class="session" href="${href}">
     <span class="number">${session.managed ? 'NEW' : 'PIN'}</span>
     <span><span class="label">${escapeHtml(session.label)}</span>
       <span class="meta">${escapeHtml(date)} · ${status}</span></span>
@@ -74,6 +81,7 @@ export function pickerResponse(
   profiles: GatewayProfileView[],
   sessionsByProfile: ReadonlyMap<string, RemoteShell[]> = new Map(),
   generateName: () => string = randomSessionName,
+  watchOnly = false,
 ): Response {
   const groups = new Map<string, GatewayProfileView[]>();
   for (const profile of profiles) {
@@ -90,7 +98,7 @@ export function pickerResponse(
     for (const profile of hostProfiles) {
       if (profile.mode === 'direct') cards.push(profileCard(profile, index++));
       for (const session of sessionsByProfile.get(profile.slug) ?? []) {
-        cards.push(sessionCard(profile, session));
+        cards.push(sessionCard(profile, session, watchOnly));
         index += 1;
       }
     }
@@ -104,7 +112,7 @@ export function pickerResponse(
   }).join('');
 
   return page('Select terminal',
-    `<div class="eyebrow">gateway online</div><h1>Select<br>terminal</h1>${hostGroups}`);
+    `<div class="eyebrow">gateway online</div><div style="text-align:right"><a href="/login" style="color:#73f7ff">Writer sign in</a></div><h1>Select<br>terminal</h1>${hostGroups}`);
 }
 
 export function sessionsResponse(

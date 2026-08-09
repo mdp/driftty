@@ -10,6 +10,12 @@ export interface GatewayProfileView {
   hostGroup: string;
   mode: 'direct' | 'registry';
   canCreateSessions: boolean;
+  publicWatch?: boolean;
+}
+
+export interface GatewayAuthConfig {
+  password?: string;
+  sessionSecret?: string;
 }
 
 export interface SshTarget {
@@ -58,12 +64,17 @@ interface LoadOptions {
 }
 
 export class GatewayPlan {
+  readonly auth: GatewayAuthConfig;
   readonly views: GatewayProfileView[];
   readonly direct: DirectShellPlan[];
   readonly registries: RemoteShellRegistryPlan[];
   private readonly bySlug: ReadonlyMap<string, GatewayInstruction>;
 
-  constructor(instructions: GatewayInstruction[]) {
+  constructor(
+    instructions: GatewayInstruction[],
+    auth: GatewayAuthConfig = {},
+  ) {
+    this.auth = auth;
     this.views = instructions.map(({view}) => view);
     this.direct = instructions.flatMap((instruction) =>
       instruction.kind === 'direct' ? [instruction] : []
@@ -181,7 +192,7 @@ export async function parseGatewayPlan(
   source: string,
   {keysDir = '/keys', checkKeys = true}: LoadOptions = {},
 ): Promise<GatewayPlan> {
-  const document = parse(source) as {profiles?: unknown};
+  const document = parse(source) as {profiles?: unknown; auth?: unknown};
   if (
     !document ||
     !Array.isArray(document.profiles) ||
@@ -190,6 +201,7 @@ export async function parseGatewayPlan(
     throw new Error('profiles must contain at least one profile');
   }
 
+  const auth = parseAuth(document.auth);
   const seen = new Set<string>();
   const hostGroups = new Map<string, string>();
   const instructions = document.profiles.map((raw, index): GatewayInstruction => {
@@ -219,11 +231,20 @@ export async function parseGatewayPlan(
       : required(value.autorun, 'autorun', index);
     const fixed = parseFixedShells(value.sessions, index);
     const managed = parseManagedShells(value.new_sessions, index);
+    if (value.public_watch !== undefined &&
+      typeof value.public_watch !== 'boolean') {
+      throw new Error(`profile ${index + 1}: public_watch must be boolean`);
+    }
     const registryMode =
       value.sessions !== undefined || value.new_sessions !== undefined;
     if (registryMode && autorun) {
       throw new Error(
         `profile ${index + 1}: autorun cannot be combined with session routing`,
+      );
+    }
+    if (value.public_watch === true && !registryMode) {
+      throw new Error(
+        `profile ${index + 1}: public_watch requires session routing`,
       );
     }
     if (
@@ -249,6 +270,7 @@ export async function parseGatewayPlan(
       hostGroup,
       mode: registryMode ? 'registry' : 'direct',
       canCreateSessions: Boolean(managed),
+      ...(value.public_watch === true ? {publicWatch: true} : {}),
     };
     const target: SshTarget = {
       slug,
@@ -273,5 +295,26 @@ export async function parseGatewayPlan(
       }
     }
   }
-  return new GatewayPlan(instructions);
+  return new GatewayPlan(instructions, auth);
+}
+
+function parseAuth(value: unknown): GatewayAuthConfig {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('auth must be a mapping');
+  }
+  const auth = value as Record<string, unknown>;
+  for (const field of ['password', 'session_secret']) {
+    if (auth[field] !== undefined &&
+      (typeof auth[field] !== 'string' || auth[field] === '')) {
+      throw new Error(`auth.${field} must be a non-empty string`);
+    }
+  }
+  if ((auth.password === undefined) !== (auth.session_secret === undefined)) {
+    throw new Error('auth.password and auth.session_secret must be configured together');
+  }
+  return {
+    password: auth.password as string | undefined,
+    sessionSecret: auth.session_secret as string | undefined,
+  };
 }

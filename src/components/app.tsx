@@ -25,6 +25,12 @@ const tokenUrl = [
   path,
   '/token',
 ].join('');
+const watchPublishUrl = (() => {
+  const route = window.location.pathname.replace(/^\/+|\/+$/g, '');
+  return route.split('/').length === 2
+    ? `${protocol}//${window.location.host}/watch/${route}/publish`
+    : undefined;
+})();
 
 const clientOptions = {
   rendererType: 'webgl',
@@ -83,6 +89,7 @@ export class App extends Component {
         termOptions={termOptions}
         flowControl={flowControl}
         viewer={viewer}
+        watchPublishUrl={watchPublishUrl}
       />
     );
   }

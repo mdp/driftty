@@ -84,6 +84,7 @@ export interface XtermOptions {
   clientOptions: ClientOptions;
   termOptions: ITerminalOptions;
   viewer: ViewerProfile;
+  watchPublishUrl?: string;
 }
 
 export interface TouchSelectionBox {
@@ -135,6 +136,8 @@ export class Xterm {
   private webglAddon?: WebglAddon;
 
   private socket?: WebSocket;
+  private watchSocket?: WebSocket;
+  private watchTimer?: ReturnType<typeof setTimeout>;
   private token: string;
   private opened = false;
   private title?: string;
@@ -337,6 +340,8 @@ export class Xterm {
     }
     this.selectionGestureDisposables.length = 0;
     this.socket?.close();
+    if (this.watchTimer) clearTimeout(this.watchTimer);
+    this.watchSocket?.close();
   }
 
   public isAutoReconnectEnabled() {
@@ -992,6 +997,38 @@ export class Xterm {
     } else {
       terminal.write(data);
     }
+    this.scheduleWatchSnapshot();
+  }
+
+  private scheduleWatchSnapshot() {
+    if (!this.options.watchPublishUrl || this.watchTimer) return;
+    this.watchTimer = setTimeout(() => {
+      this.watchTimer = undefined;
+      this.publishWatchSnapshot();
+    }, 100);
+  }
+
+  private publishWatchSnapshot() {
+    const url = this.options.watchPublishUrl;
+    if (!url) return;
+    if (!this.watchSocket) {
+      this.watchSocket = new WebSocket(url);
+      this.watchSocket.onopen = () => this.publishWatchSnapshot();
+    }
+    if (this.watchSocket.readyState !== WebSocket.OPEN) return;
+    const buffer = this.terminal.buffer.active;
+    const lines: string[] = [];
+    for (let row = 0; row < this.terminal.rows; row++) {
+      lines.push(
+        buffer.getLine(buffer.viewportY + row)?.translateToString(true) ?? '',
+      );
+    }
+    this.watchSocket.send(JSON.stringify({
+      columns: this.terminal.cols,
+      rows: this.terminal.rows,
+      lines,
+      updatedAt: Date.now(),
+    }));
   }
 
   @bind
@@ -1064,6 +1101,7 @@ export class Xterm {
     this.reconnectListener?.(false);
     this.setConnectionState('connected');
     this.initListeners();
+    this.scheduleWatchSnapshot();
     this.focus();
   }
 

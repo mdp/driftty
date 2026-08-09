@@ -82,10 +82,9 @@ The demo endpoint has no authentication. Keep the published port bound to
 ## Installation: install the SSH gateway
 
 > **Alpha software and security warning:** driftty is very early-stage software.
-> The gateway does **not** provide authentication or access control. The person
-> operating it is responsible for putting it behind an authenticated tunnel,
-> reverse proxy, VPN, or other trusted access boundary before exposing it to a
-> network. Do not publish the gateway directly to the internet.
+> The gateway uses the plaintext password and session secret in
+> `config/profiles.yaml`. Keep that file private and publish the gateway only
+> over HTTPS. Do not commit the file or publish it directly to the internet.
 
 For real, long-lived access to your own shells, install the gateway. Download
 the gateway bundle from the latest GitHub release, unpack it, and run:
@@ -100,6 +99,7 @@ Then:
 
 1. Add the Cloudflare remotely managed tunnel token to `.env`.
 2. Edit `config/profiles.yaml` with your SSH host, user, port, and key name.
+   Set `auth.password` and `auth.session_secret` before publishing the gateway.
 3. Install the generated public key using the printed `ssh-copy-id` command.
 4. Point the Cloudflare tunnel origin to `http://gateway:7681`.
 5. Start the gateway with `docker compose up -d`.
@@ -216,18 +216,21 @@ The image enables writable input and embeds the complete client at
 
 ### Connection and security model
 
-The gateway does not handle authentication. Authentication and access policy
-are entirely the responsibility of the operator and must be enforced by the
-tunnel or reverse-proxy layer in front of it. Treat the gateway as an internal
-service, not as a public internet-facing application.
+The gateway handles its single writer password and read-only watch access.
+The tunnel still provides transport security and should terminate HTTPS before
+the gateway.
+
+Registry sessions can opt into a public, read-only watch page with
+`public_watch: true`. Watchers receive a one-way screen view from the writer's
+browser and cannot connect to SSH, tmux, or ttyd. They can pan and zoom the
+local view, but cannot resize or interact with the terminal.
 
 Each browser connection gets a separate SSH process. Session-routed
 connections attach that process to the selected tmux session.
 
 SSH uses public-key authentication only, accepts previously unseen host keys,
-and rejects changed keys. Caddy handles internal HTTP and WebSocket routing; it
-does not provide authentication. Configure authentication and access policy at
-the tunnel or reverse-proxy layer.
+and rejects changed keys. Caddy handles internal HTTP and WebSocket routing,
+while the gateway enforces the writer password before terminal connections.
 
 When a shell exits normally, driftty stops reconnecting and shows an **Exited**
 screen. Unexpected network interruptions use automatic reconnection with
