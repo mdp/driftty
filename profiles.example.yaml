@@ -1,8 +1,3 @@
-auth:
-  # Keep the real file out of Git. These are example credentials.
-  password: replace-this-writer-password
-  session_secret: replace-this-with-a-long-random-secret
-
 profiles:
   - slug: baz
     label: Baz server
@@ -15,7 +10,6 @@ profiles:
       - name: mdp
         label: MDP terminal
         directory: /home/mark
-    public_watch: true
     new_sessions:
       enabled: true
       directory: /home/mark

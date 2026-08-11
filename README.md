@@ -82,9 +82,10 @@ The demo endpoint has no authentication. Keep the published port bound to
 ## Installation: install the SSH gateway
 
 > **Alpha software and security warning:** driftty is very early-stage software.
-> The gateway uses the plaintext password and session secret in
-> `config/profiles.yaml`. Keep that file private and publish the gateway only
-> over HTTPS. Do not commit the file or publish it directly to the internet.
+> The gateway protects every terminal with one master password, but it does not
+> provide rate limiting or multi-user accounts. Publish it only through an HTTPS
+> tunnel or reverse proxy, and choose a strong password if you replace the
+> generated one.
 
 For real, long-lived access to your own shells, install the gateway. Download
 the gateway bundle from the latest GitHub release, unpack it, and run:
@@ -99,10 +100,21 @@ Then:
 
 1. Add the Cloudflare remotely managed tunnel token to `.env`.
 2. Edit `config/profiles.yaml` with your SSH host, user, port, and key name.
-   Set `auth.password` and `auth.session_secret` before publishing the gateway.
 3. Install the generated public key using the printed `ssh-copy-id` command.
 4. Point the Cloudflare tunnel origin to `http://gateway:7681`.
 5. Start the gateway with `docker compose up -d`.
+
+On each unconfigured start, the gateway generates a new 192-bit URL-safe master
+password. Retrieve it after starting the stack:
+
+```bash
+docker compose logs gateway
+```
+
+The generated password changes whenever the gateway process restarts, which
+also signs every browser out. For a stable password and sessions that survive
+gateway restarts, uncomment `DRIFTTY_PASSWORD` in `.env`, set it to a strong
+value, and restart the gateway. The configured value is not printed to logs.
 
 Each gateway bundle pins the gateway image to the matching driftty version and
 is ready to configure: SSH configuration and private keys are mounted
@@ -216,21 +228,31 @@ The image enables writable input and embeds the complete client at
 
 ### Connection and security model
 
-The gateway handles its single writer password and read-only watch access.
-The tunnel still provides transport security and should terminate HTTPS before
-the gateway.
+The gateway requires its single master password for the picker and every
+terminal HTTP, asset, token, and WebSocket route. Only `/login`, `/logout`, and
+`/_health` are public. Successful login creates a signed, HTTP-only browser
+session for 30 days. Cookies are marked secure when HTTPS reaches the gateway
+directly or is reported by the tunnel through `X-Forwarded-Proto`.
 
-Registry sessions can opt into a public, read-only watch page with
-`public_watch: true`. Watchers receive a one-way screen view from the writer's
-browser and cannot connect to SSH, tmux, or ttyd. They can pan and zoom the
-local view, but cannot resize or interact with the terminal.
+The cookie-signing key is derived from the active master password. Keeping the
+same configured `DRIFTTY_PASSWORD` preserves browser sessions across gateway
+restarts; changing it immediately invalidates existing sessions. An
+automatically generated password is intentionally not persisted, so every
+restart rotates the password and invalidates sessions.
+
+For deliberate trusted-network development only, pass `--no-auth` as the
+gateway container command (for example, add `command: ["--no-auth"]` to the
+gateway service). This overrides `DRIFTTY_PASSWORD`, prints a prominent warning,
+and removes login and sign-out controls. Never use this mode on an untrusted
+network.
 
 Each browser connection gets a separate SSH process. Session-routed
 connections attach that process to the selected tmux session.
 
 SSH uses public-key authentication only, accepts previously unseen host keys,
-and rejects changed keys. Caddy handles internal HTTP and WebSocket routing,
-while the gateway enforces the writer password before terminal connections.
+and rejects changed keys. Caddy handles internal HTTP and WebSocket routing and
+checks the master-password session before terminal connections. The tunnel must
+terminate HTTPS so passwords and terminal traffic are encrypted in transit.
 
 When a shell exits normally, driftty stops reconnecting and shows an **Exited**
 screen. Unexpected network interruptions use automatic reconnection with
@@ -258,6 +280,7 @@ To run the complete gateway from the current checkout:
 
 ```bash
 docker compose -f compose.local.yaml up --build -d
+docker compose -f compose.local.yaml logs gateway
 ```
 
 This uses the same `config/profiles.yaml`, `keys/`, known-hosts volume, and

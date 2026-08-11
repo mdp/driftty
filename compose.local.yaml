@@ -8,6 +8,8 @@ services:
   gateway:
     image: driftty-gateway:local
     build: *gateway-build
+    environment:
+      DRIFTTY_PASSWORD: "${DRIFTTY_PASSWORD:-}"
     volumes:
       - ./config/profiles.yaml:/config/profiles.yaml:ro
       - ./keys:/keys:ro

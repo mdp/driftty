@@ -44,6 +44,12 @@ function createSessionControl(
   </details>`;
 }
 
+function authLink(authEnabled: boolean): string {
+  return authEnabled
+    ? '<a href="/logout" style="color:#73f7ff">Sign out</a>'
+    : '';
+}
+
 function profileCard(profile: GatewayProfileView, index: number): string {
   return `<a class="host" href="/${profile.slug}/">
     <span class="number">${String(index + 1).padStart(2, '0')}</span>
@@ -55,7 +61,6 @@ function profileCard(profile: GatewayProfileView, index: number): string {
 function sessionCard(
   profile: GatewayProfileView,
   session: RemoteShell,
-  watchOnly = false,
 ): string {
   const date = session.created
     ? new Date(session.created * 1000).toLocaleString('en-CA', {
@@ -66,10 +71,7 @@ function sessionCard(
   const status = session.attached > 0
     ? `attached ×${session.attached}`
     : 'detached';
-  const href = watchOnly && profile.publicWatch
-    ? `/watch/${profile.slug}/${session.slug}/`
-    : `/${profile.slug}/${session.slug}/`;
-  return `<a class="session" href="${href}">
+  return `<a class="session" href="/${profile.slug}/${session.slug}/">
     <span class="number">${session.managed ? 'NEW' : 'PIN'}</span>
     <span><span class="label">${escapeHtml(session.label)}</span>
       <span class="meta">${escapeHtml(date)} · ${status}</span></span>
@@ -81,7 +83,7 @@ export function pickerResponse(
   profiles: GatewayProfileView[],
   sessionsByProfile: ReadonlyMap<string, RemoteShell[]> = new Map(),
   generateName: () => string = randomSessionName,
-  watchOnly = false,
+  authEnabled = false,
 ): Response {
   const groups = new Map<string, GatewayProfileView[]>();
   for (const profile of profiles) {
@@ -98,7 +100,7 @@ export function pickerResponse(
     for (const profile of hostProfiles) {
       if (profile.mode === 'direct') cards.push(profileCard(profile, index++));
       for (const session of sessionsByProfile.get(profile.slug) ?? []) {
-        cards.push(sessionCard(profile, session, watchOnly));
+        cards.push(sessionCard(profile, session));
         index += 1;
       }
     }
@@ -112,13 +114,14 @@ export function pickerResponse(
   }).join('');
 
   return page('Select terminal',
-    `<div class="eyebrow">gateway online</div><div style="text-align:right"><a href="/login" style="color:#73f7ff">Writer sign in</a></div><h1>Select<br>terminal</h1>${hostGroups}`);
+    `<div class="eyebrow">gateway online</div><div style="text-align:right">${authLink(authEnabled)}</div><h1>Select<br>terminal</h1>${hostGroups}`);
 }
 
 export function sessionsResponse(
   profile: GatewayProfileView,
   sessions: RemoteShell[],
   ended?: string,
+  authEnabled = false,
 ): Response {
   const fixed = sessions.filter((session) => !session.managed);
   const managed = sessions.filter((session) => session.managed);
@@ -140,6 +143,7 @@ export function sessionsResponse(
     : '';
 
   return page(profile.label, `<div class="eyebrow">host online</div>
+    <div style="text-align:right">${authLink(authEnabled)}</div>
     <div class="heading"><h1>${escapeHtml(profile.label)}</h1>${create}</div>
     ${notice}<div class="section">Pinned</div><div class="sessions">${fixedCards}</div>
     ${managedSection}`);

@@ -22,7 +22,7 @@ import {
 import {
   setNativeInputDisabled,
 } from '../../../touch-input';
-import type {ViewerProfile} from '../../../viewer-profile';
+import type {ClientProfile} from '../../../client-profile';
 import {selectionRange, terminalCellAt} from '../../../desktop-selection';
 import {cleanCopyText} from '../../../copy-text';
 
@@ -83,8 +83,7 @@ export interface XtermOptions {
   flowControl: FlowControl;
   clientOptions: ClientOptions;
   termOptions: ITerminalOptions;
-  viewer: ViewerProfile;
-  watchPublishUrl?: string;
+  client: ClientProfile;
 }
 
 export interface TouchSelectionBox {
@@ -136,8 +135,6 @@ export class Xterm {
   private webglAddon?: WebglAddon;
 
   private socket?: WebSocket;
-  private watchSocket?: WebSocket;
-  private watchTimer?: ReturnType<typeof setTimeout>;
   private token: string;
   private opened = false;
   private title?: string;
@@ -160,7 +157,7 @@ export class Xterm {
   private touchSelectionListener?: (state: TouchSelectionState) => void;
   private selectionGestureDisposables: IDisposable[] = [];
   private touchSelectionText = '';
-  private readonly mobileViewer = this.options.viewer.formFactor === 'mobile';
+  private readonly mobileClient = this.options.client.formFactor === 'mobile';
   private webKeyboardActive = false;
   private fixedSize?: {columns: number; rows: number};
   private cancelTouchGesture?: () => void;
@@ -265,7 +262,7 @@ export class Xterm {
   }
 
   public focus() {
-    if (this.mobileViewer) return;
+    if (this.mobileClient) return;
     this.terminal?.focus();
   }
 
@@ -281,12 +278,12 @@ export class Xterm {
     if (!textarea) return;
     setNativeInputDisabled(
       textarea,
-      this.mobileViewer || this.webKeyboardActive,
+      this.mobileClient || this.webKeyboardActive,
     );
   }
 
   public isNativeInputDisabled() {
-    return this.mobileViewer || this.webKeyboardActive;
+    return this.mobileClient || this.webKeyboardActive;
   }
 
   public armInputModifier(modifier: InputModifier) {
@@ -340,8 +337,6 @@ export class Xterm {
     }
     this.selectionGestureDisposables.length = 0;
     this.socket?.close();
-    if (this.watchTimer) clearTimeout(this.watchTimer);
-    this.watchSocket?.close();
   }
 
   public isAutoReconnectEnabled() {
@@ -475,7 +470,7 @@ export class Xterm {
   }
 
   private initTouchSelection() {
-    if (!this.mobileViewer || !this.terminal.element) return;
+    if (!this.mobileClient || !this.terminal.element) return;
     const element = this.terminal.element;
     let startX = 0;
     let startY = 0;
@@ -594,7 +589,7 @@ export class Xterm {
   }
 
   private initTouchScroll() {
-    if (!this.mobileViewer || !this.terminal.element) return;
+    if (!this.mobileClient || !this.terminal.element) return;
     const element = this.terminal.element;
     let pointerId: number | undefined;
     let startX = 0;
@@ -691,7 +686,7 @@ export class Xterm {
    * other desktop (xterm otherwise uses Option there).
    */
   private initDesktopSelection() {
-    if (this.mobileViewer || !this.terminal.element) return;
+    if (this.mobileClient || !this.terminal.element) return;
     const element = this.terminal.element;
     let start: ReturnType<typeof terminalCellAt> | undefined;
 
@@ -757,7 +752,7 @@ export class Xterm {
   }
 
   private initDesktopRectangleSelection() {
-    if (this.mobileViewer || !this.terminal.element) return;
+    if (this.mobileClient || !this.terminal.element) return;
     const element = this.terminal.element;
     let startX = 0;
     let startY = 0;
@@ -997,38 +992,6 @@ export class Xterm {
     } else {
       terminal.write(data);
     }
-    this.scheduleWatchSnapshot();
-  }
-
-  private scheduleWatchSnapshot() {
-    if (!this.options.watchPublishUrl || this.watchTimer) return;
-    this.watchTimer = setTimeout(() => {
-      this.watchTimer = undefined;
-      this.publishWatchSnapshot();
-    }, 100);
-  }
-
-  private publishWatchSnapshot() {
-    const url = this.options.watchPublishUrl;
-    if (!url) return;
-    if (!this.watchSocket) {
-      this.watchSocket = new WebSocket(url);
-      this.watchSocket.onopen = () => this.publishWatchSnapshot();
-    }
-    if (this.watchSocket.readyState !== WebSocket.OPEN) return;
-    const buffer = this.terminal.buffer.active;
-    const lines: string[] = [];
-    for (let row = 0; row < this.terminal.rows; row++) {
-      lines.push(
-        buffer.getLine(buffer.viewportY + row)?.translateToString(true) ?? '',
-      );
-    }
-    this.watchSocket.send(JSON.stringify({
-      columns: this.terminal.cols,
-      rows: this.terminal.rows,
-      lines,
-      updatedAt: Date.now(),
-    }));
   }
 
   @bind
@@ -1101,7 +1064,6 @@ export class Xterm {
     this.reconnectListener?.(false);
     this.setConnectionState('connected');
     this.initListeners();
-    this.scheduleWatchSnapshot();
     this.focus();
   }
 

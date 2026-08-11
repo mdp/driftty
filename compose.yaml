@@ -3,6 +3,8 @@ name: driftty
 services:
   gateway:
     image: ghcr.io/mdp/driftty-gateway:${DRIFTTY_TAG:-latest}
+    environment:
+      DRIFTTY_PASSWORD: "${DRIFTTY_PASSWORD:-}"
     volumes:
       - ./config/profiles.yaml:/config/profiles.yaml:ro
       - ./keys:/keys:ro
