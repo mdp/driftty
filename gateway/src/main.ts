@@ -179,7 +179,7 @@ const picker = Bun.serve({
       } catch (error) {
         const detail =
           error instanceof Error ? error.message : 'Could not create session';
-        return unavailableResponse(instruction.view, detail);
+        return unavailableResponse(instruction.view, detail, auth.enabled);
       }
     }
 
@@ -220,7 +220,7 @@ const picker = Bun.serve({
     } catch (error) {
       const detail =
         error instanceof Error ? error.message : 'Could not reach host';
-      return unavailableResponse(instruction.view, detail);
+      return unavailableResponse(instruction.view, detail, auth.enabled);
     }
     return new Response('Not found', {status: 404});
   },

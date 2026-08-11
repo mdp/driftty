@@ -152,8 +152,10 @@ export function sessionsResponse(
 export function unavailableResponse(
   profile: GatewayProfileView,
   detail: string,
+  authEnabled = false,
 ): Response {
   return page(`${profile.label} unavailable`, `<div class="eyebrow">host unavailable</div>
+    <div style="text-align:right">${authLink(authEnabled)}</div>
     <h1>${escapeHtml(profile.label)}</h1>
     <div class="notice">${escapeHtml(detail)}</div>
     <a class="host" href="/"><span class="number">←</span><span class="label">Back to hosts</span><span class="arrow">›</span></a>`);

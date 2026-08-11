@@ -1,5 +1,5 @@
 import {describe, expect, test} from 'bun:test';
-import {pickerResponse, sessionsResponse} from './picker';
+import {pickerResponse, sessionsResponse, unavailableResponse} from './picker';
 import type {GatewayProfileView} from './gateway-plan';
 
 const profile = (slug: string, label: string): GatewayProfileView => ({
@@ -91,5 +91,15 @@ describe('host picker', () => {
     expect(body).toContain('href="/aachen/clever-turing/"');
     expect(body).toContain('clever-turing');
     expect(body).toContain('href="/logout"');
+  });
+
+  test('keeps sign out available when a session page is unavailable', async () => {
+    const response = unavailableResponse(
+      profile('aachen', 'Aachen'),
+      'Could not reach host',
+      true,
+    );
+
+    expect(await response.text()).toContain('href="/logout"');
   });
 });
