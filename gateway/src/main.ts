@@ -1,8 +1,11 @@
 import {readFile, mkdir} from 'node:fs/promises';
 import {dirname} from 'node:path';
 import {
+  combineGatewayPlans,
+  localTmuxGatewayPlan,
   parseGatewayPlan,
-  type RemoteShellRegistryPlan,
+  validateLocalTmuxSocket,
+  type ShellRegistryPlan,
 } from './gateway-plan';
 import {
   pickerResponse,
@@ -21,24 +24,43 @@ import {
   TerminalRoutes,
   type RemoteTerminalTarget,
 } from './terminal-routes';
+import {LocalTmuxConnection} from './local-tmux';
+import {parseGatewayStartupOptions} from './startup-options';
 
 const configPath = process.env.PROFILES_FILE ?? '/config/profiles.yaml';
 const knownHosts = process.env.KNOWN_HOSTS_FILE ?? '/known-hosts/known_hosts';
 const ttydStartPort = 7800;
 const pickerPort = 7799;
-const authStartup = configureAuth(process.argv.slice(2), process.env);
+const startup = parseGatewayStartupOptions(process.argv.slice(2));
+const authStartup = configureAuth(startup.authArguments, process.env);
 const auth = authStartup.auth;
 
 if (authStartup.message) console.warn(authStartup.message);
 
-await mkdir(dirname(knownHosts), {recursive: true});
-const plan = await parseGatewayPlan(await readFile(configPath, 'utf8'));
+const plans = [];
+if (startup.localTmux) {
+  await validateLocalTmuxSocket(startup.localTmux);
+  plans.push(localTmuxGatewayPlan(startup.localTmux));
+}
+try {
+  plans.push(await parseGatewayPlan(await readFile(configPath, 'utf8')));
+} catch (error) {
+  const missingConfig = error && typeof error === 'object' &&
+    'code' in error && error.code === 'ENOENT';
+  if (!startup.localTmux || !missingConfig) throw error;
+}
+const plan = combineGatewayPlans(...plans);
+if (plan.instructions.some(({kind}) => kind !== 'local-registry')) {
+  await mkdir(dirname(knownHosts), {recursive: true});
+}
 const registries = new Map(
   plan.registries.map((instruction) => [
     instruction.view.slug,
     new RemoteShellRegistry(
       instruction,
-      new SshConnection(instruction.target, knownHosts),
+      instruction.kind === 'local-registry'
+        ? new LocalTmuxConnection(instruction.socket)
+        : new SshConnection(instruction.target, knownHosts),
     ),
   ]),
 );
@@ -51,7 +73,7 @@ const terminalRoutes = new TerminalRoutes({
 });
 
 function terminalTarget(
-  instruction: RemoteShellRegistryPlan,
+  instruction: ShellRegistryPlan,
   registry: RemoteShellRegistry,
   shell: RemoteShell,
 ): RemoteTerminalTarget {
@@ -64,7 +86,7 @@ function terminalTarget(
 }
 
 async function discover(
-  instruction: RemoteShellRegistryPlan,
+  instruction: ShellRegistryPlan,
   registry: RemoteShellRegistry,
 ): Promise<RemoteShellSnapshot> {
   const snapshot = await registry.discover();
@@ -153,7 +175,10 @@ const picker = Bun.serve({
 
     const parts = url.pathname.split('/').filter(Boolean);
     const instruction = parts[0] ? plan.get(parts[0]) : undefined;
-    if (!instruction || instruction.kind !== 'registry') {
+    if (
+      !instruction ||
+      (instruction.kind !== 'registry' && instruction.kind !== 'local-registry')
+    ) {
       return new Response('Not found', {status: 404});
     }
     const registry = registries.get(instruction.view.slug)!;

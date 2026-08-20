@@ -29,6 +29,13 @@ jobs:
           docker build --target generic -t driftty:test .
           docker build --target demo -t driftty-demo:test .
           docker build --target gateway -t driftty-gateway:test .
+      - name: Test local tmux gateway
+        env:
+          DRIFTTY_GATEWAY_IMAGE: driftty-gateway:test
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tmux
+          scripts/local-tmux-gateway.integration.test.sh
       - name: Smoke test arbitrary command
         run: |
           id=$(docker run -d -p 17681:7681 driftty:test sh)

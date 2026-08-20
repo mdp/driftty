@@ -1,5 +1,5 @@
 import {describe, expect, test} from 'bun:test';
-import type {RemoteShellRegistryPlan} from './gateway-plan';
+import type {LocalShellRegistryPlan, RemoteShellRegistryPlan} from './gateway-plan';
 import {
   RemoteShellRegistry,
   type RemoteShellConnection,
@@ -58,6 +58,86 @@ function harness(outputs: Array<string | Error>) {
 }
 
 describe('remote shell registry', () => {
+  test('local discovery exposes every exact tmux name with stable collision-safe routes', async () => {
+    const localPlan: LocalShellRegistryPlan = {
+      kind: 'local-registry',
+      view: {...plan.view, slug: 'local', localTmux: true},
+      socket: '/run/host-tmux/default', fixed: [],
+      managed: {prefix: 'driftty-'}, discovery: 'all',
+    };
+    const listed = [
+        'Review API\t1785140000\t2',
+        'UPPER_case!\t1785140001\t0',
+        'review-api\t1785140002\t0',
+        'driftty-review-api\t1785140003\t1',
+      ].join('\n');
+    let output = listed;
+    const connection: RemoteShellConnection = {
+      run: async () => output,
+      terminalCommand: (command) => ['local', command],
+    };
+    const registry = new RemoteShellRegistry(localPlan, connection);
+
+    const first = await registry.discover();
+    output = '';
+    const disappeared = await registry.discover();
+    output = listed;
+    const second = await registry.discover();
+
+    expect(first.active.map(({label}) => label)).toEqual([
+      'Review API', 'UPPER_case!', 'review-api', 'review-api',
+    ]);
+    expect(first.active.map(({attached}) => attached)).toEqual([2, 0, 0, 1]);
+    expect(first.active.map(({slug}) => slug)).toEqual([
+      'tmux-UmV2aWV3IEFQSQ',
+      'tmux-VVBQRVJfY2FzZSE',
+      'tmux-cmV2aWV3LWFwaQ',
+      'tmux-ZHJpZnR0eS1yZXZpZXctYXBp',
+    ]);
+    expect(first.active.every(({kind}) => kind === 'local')).toBe(true);
+    expect(disappeared).toEqual({active: [], visible: []});
+    expect(second).toEqual(first);
+  });
+
+  test('local creation uses the host tmux HOME and remains serialized', async () => {
+    const localPlan: LocalShellRegistryPlan = {
+      kind: 'local-registry',
+      view: {...plan.view, slug: 'local', localTmux: true},
+      socket: '/run/host-tmux/default', fixed: [],
+      managed: {prefix: 'driftty-'}, discovery: 'all',
+    };
+    const commands: string[] = [];
+    const sessions = new Set<string>();
+    const connection: RemoteShellConnection = {
+      async run(command) {
+        commands.push(command);
+        if (command.startsWith('tmux list-sessions')) {
+          return [...sessions].map((name) => `${name}\t1785140000\t0`).join('\n');
+        }
+        if (command === 'tmux show-environment -g HOME') return "HOME=/home/host user's work\n";
+        const match = command.match(/new-session -d -s '([^']+)'/);
+        if (match) sessions.add(match[1]!);
+        return '';
+      },
+      terminalCommand: (command) => ['local', command],
+    };
+    const registry = new RemoteShellRegistry(localPlan, connection, {
+      now: () => 1000,
+      random: () => 0,
+    });
+
+    const results = await Promise.allSettled([
+      registry.create({name: 'review-api'}),
+      registry.create({name: 'review-api'}),
+    ]);
+
+    expect(results.map(({status}) => status)).toEqual(['fulfilled', 'rejected']);
+    expect(commands).toContain("tmux new-session -d -s 'driftty-review-api' -c '/home/host user'\"'\"'s work'");
+    const generated = await registry.create();
+    expect(generated).toMatchObject({
+      name: 'driftty-bold-ada', label: 'bold-ada', kind: 'local', managed: true,
+    });
+  });
   test('discovers only owned shells and includes missing fixed shells in its view', async () => {
     const {registry} = harness([
       [

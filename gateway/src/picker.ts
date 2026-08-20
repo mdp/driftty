@@ -72,7 +72,7 @@ function sessionCard(
     ? `attached ×${session.attached}`
     : 'detached';
   return `<a class="session" href="/${profile.slug}/${session.slug}/">
-    <span class="number">${session.managed ? 'NEW' : 'PIN'}</span>
+    <span class="number">${session.kind === 'local' ? 'TMX' : session.managed ? 'NEW' : 'PIN'}</span>
     <span><span class="label">${escapeHtml(session.label)}</span>
       <span class="meta">${escapeHtml(date)} · ${status}</span></span>
     <span class="arrow">›</span>
@@ -123,6 +123,7 @@ export function sessionsResponse(
   ended?: string,
   authEnabled = false,
 ): Response {
+  const local = profile.localTmux === true;
   const fixed = sessions.filter((session) => !session.managed);
   const managed = sessions.filter((session) => session.managed);
   const create = profile.canCreateSessions
@@ -134,18 +135,25 @@ export function sessionsResponse(
   const fixedCards = fixed.length
     ? fixed.map((session) => sessionCard(profile, session)).join('')
     : '<div class="empty">No pinned sessions are running.</div>';
-  const managedSection = profile.canCreateSessions
+  const managedSection = profile.canCreateSessions && !local
     ? `<div class="section">New sessions</div><div class="sessions">${
       managed.length
         ? managed.map((session) => sessionCard(profile, session)).join('')
         : '<div class="empty">Create a session with the + button.</div>'
     }</div>`
     : '';
+  const localSection = local
+    ? `<div class="section">tmux sessions</div><div class="sessions">${
+      sessions.length
+        ? sessions.map((session) => sessionCard(profile, session)).join('')
+        : '<div class="empty">No tmux sessions are running.</div>'
+    }</div>`
+    : '';
 
   return page(profile.label, `<div class="eyebrow">host online</div>
     <div style="text-align:right">${authLink(authEnabled)}</div>
     <div class="heading"><h1>${escapeHtml(profile.label)}</h1>${create}</div>
-    ${notice}<div class="section">Pinned</div><div class="sessions">${fixedCards}</div>
+    ${notice}${localSection}${local ? '' : `<div class="section">Pinned</div><div class="sessions">${fixedCards}</div>`}
     ${managedSection}`);
 }
 

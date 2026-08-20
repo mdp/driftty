@@ -102,4 +102,21 @@ describe('host picker', () => {
 
     expect(await response.text()).toContain('href="/logout"');
   });
+
+  test('labels local cards and sections as tmux sessions', async () => {
+    const item = profile('local', 'Local tmux');
+    item.mode = 'registry';
+    item.canCreateSessions = true;
+    item.localTmux = true;
+    const response = sessionsResponse(item, [{
+      kind: 'local', slug: 'tmux-ZHJpZnR0eS1yZXZpZXctYXBp',
+      name: 'driftty-review-api', label: 'review-api',
+      created: 1785140000, attached: 1, managed: true, available: true,
+    }]);
+    const body = await response.text();
+
+    expect(body).toContain('>TMX<');
+    expect(body).toContain('tmux sessions');
+    expect(body).not.toContain('>Pinned<');
+  });
 });

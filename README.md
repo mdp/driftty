@@ -79,6 +79,54 @@ docker run --rm \
 The demo endpoint has no authentication. Keep the published port bound to
 `127.0.0.1` and do not expose it to an untrusted network.
 
+## Quick start: local tmux
+
+On a Linux host, make sure your user has a running tmux server, build the
+gateway, and mount that server's socket:
+
+```bash
+tmux has-session 2>/dev/null || tmux new-session -d -s main
+docker build --target gateway -t driftty-gateway:local .
+
+docker run --rm --name driftty-local \
+  -p 127.0.0.1:7681:7681 \
+  -v "/tmp/tmux-$(id -u):/run/host-tmux:ro" \
+  driftty-gateway:local \
+  --local-tmux /run/host-tmux/default
+```
+
+The foreground log prints a generated master password. Open
+<http://localhost:7681>, sign in, and choose any tmux session. The **+** button
+creates a host session named `driftty-<name>`. Commands and new shells run as
+the host user through the host tmux server; only the tmux client runs in Docker.
+
+At least one tmux session must remain alive to keep the default server and
+socket running. For detached gateway operation, add
+`-d --restart unless-stopped` and retrieve the generated password with
+`docker logs driftty-local`.
+
+This needs a Linux host using tmux's default
+`/tmp/tmux-$(id -u)/default` socket, or an equivalent explicit source mount.
+macOS Docker Desktop cannot expose its host tmux socket this way. Socket access
+is effectively host-user shell access, so keep the loopback port binding unless
+you put the gateway on a trusted network. Publishing with `-p 7681:7681`
+listens on all interfaces and is plaintext HTTP until a TLS tunnel or reverse
+proxy protects it.
+
+Local tmux and SSH profiles can be used independently or together:
+
+- Local only: use the command above; no profile file or SSH keys are needed.
+- SSH only: use the normal Compose/configuration flow below without
+  `--local-tmux`.
+- Both: run the configured gateway with its usual `/config`, `/keys`, and
+  known-hosts mounts, add the tmux socket mount, and append
+  `--local-tmux /run/host-tmux/default` to its command.
+
+When `--local-tmux` is present, the gateway adds the built-in **Local tmux**
+entry to any readable `profiles.yaml`. If that file is absent, it starts in
+local-only mode. The configured profile slug `local` is reserved when both
+modes are enabled.
+
 ## Installation: install the SSH gateway
 
 > **Alpha software and security warning:** driftty is very early-stage software.
@@ -246,8 +294,10 @@ gateway service). This overrides `DRIFTTY_PASSWORD`, prints a prominent warning,
 and removes login and sign-out controls. Never use this mode on an untrusted
 network.
 
-Each browser connection gets a separate SSH process. Session-routed
-connections attach that process to the selected tmux session.
+Each remote browser connection gets a separate SSH process. Local tmux
+connections instead run a tmux client in the gateway container against the
+mounted socket. Session-routed connections attach to the selected tmux session
+in either mode.
 
 SSH uses public-key authentication only, accepts previously unseen host keys,
 and rejects changed keys. Caddy handles internal HTTP and WebSocket routing and

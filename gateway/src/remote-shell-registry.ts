@@ -1,10 +1,11 @@
 import type {
   FixedShellPlan,
-  RemoteShellRegistryPlan,
+  ShellRegistryPlan,
 } from './gateway-plan';
 import {randomSessionName, sessionSlug} from './names';
 
 export interface RemoteShell {
+  kind?: 'shell' | 'local';
   slug: string;
   name: string;
   label: string;
@@ -34,9 +35,9 @@ interface RegistryOptions {
 }
 
 type RemoteShellRegistryConfig = Pick<
-  RemoteShellRegistryPlan,
+  ShellRegistryPlan,
   'view' | 'fixed' | 'managed'
->;
+> & {discovery?: 'all'};
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`;
@@ -53,9 +54,13 @@ function createCommand(
   return args.join(' ');
 }
 
+export function localSessionSlug(name: string): string {
+  return `tmux-${Buffer.from(name, 'utf8').toString('base64url')}`;
+}
+
 export class RemoteShellRegistry {
   private readonly plan: RemoteShellRegistryConfig;
-  private readonly connection: RemoteShellConnection;
+  readonly connection: RemoteShellConnection;
   private readonly random: () => number;
   private readonly now: () => number;
   private readonly ensuring = new Map<string, Promise<RemoteShell | undefined>>();
@@ -77,33 +82,40 @@ export class RemoteShellRegistry {
 
   async discover(): Promise<RemoteShellSnapshot> {
     const output = await this.connection.run(
-      `tmux list-sessions -F '#{session_name}\t#{session_created}\t#{session_attached}'`,
+      `tmux list-sessions -F '#{session_name}:#{session_created}:#{session_attached}'`,
       {allowEmpty: true},
     );
     const fixedByName = new Map(
       this.plan.fixed.map((shell) => [shell.name, shell]),
     );
     const prefix = this.plan.managed?.prefix;
+    const discoverAll = this.plan.discovery === 'all';
     const active = output.trim().split('\n').filter(Boolean)
       .flatMap((line): RemoteShell[] => {
-        const fields = line.split('\t');
-        if (fields.length !== 3) return [];
-        const [name, createdValue, attachedValue] = fields;
+        const fields = line.match(/^(.*?)(?:\t|:)(\d+)(?:\t|:)(\d+)$/);
+        if (!fields) return [];
+        const [, name, createdValue, attachedValue] = fields;
         if (!name || !/^\d+$/.test(createdValue!) || !/^\d+$/.test(attachedValue!)) {
           return [];
         }
         const fixed = fixedByName.get(name);
         const managed = Boolean(prefix && name.startsWith(prefix));
-        if (!fixed && !managed) return [];
-        const slug = fixed?.slug ?? name.slice(prefix!.length);
-        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return [];
+        if (!discoverAll && !fixed && !managed) return [];
+        const managedSlug = managed ? name.slice(prefix!.length) : undefined;
+        const validManagedSlug = managedSlug !== undefined &&
+          /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(managedSlug);
+        const slug = fixed?.slug ?? (discoverAll
+          ? localSessionSlug(name)
+          : validManagedSlug ? managedSlug! : '');
+        if (!slug) return [];
         return [{
+          ...(discoverAll ? {kind: 'local' as const} : {}),
           slug,
           name,
-          label: fixed?.label ?? slug,
+          label: fixed?.label ?? (validManagedSlug ? managedSlug! : name),
           created: Number(createdValue),
           attached: Number(attachedValue),
-          managed,
+          managed: managed && validManagedSlug,
           available: true,
           ...(fixed ? {fixed} : {}),
         }];
@@ -179,7 +191,8 @@ export class RemoteShellRegistry {
       );
     }
     const used = new Set([
-      ...active.map((shell) => shell.slug),
+      ...active.filter((shell) => shell.managed)
+        .map((shell) => shell.name.slice(settings.prefix.length)),
       ...this.plan.fixed.map((shell) => shell.slug),
     ]);
     let slug: string;
@@ -200,17 +213,34 @@ export class RemoteShellRegistry {
       if (!slug) throw new Error('could not generate a unique session name');
     }
     const name = `${settings.prefix}${slug}`;
+    if (active.some((shell) => shell.name === name)) {
+      throw new Error(`shell name "${slug}" is already in use`);
+    }
+    const directory = this.plan.discovery === 'all'
+      ? await this.localHome()
+      : settings.directory;
     await this.connection.run(
-      createCommand(name, settings.directory, settings.command),
+      createCommand(name, directory, settings.command),
     );
     return {
-      slug,
+      slug: this.plan.discovery === 'all' ? localSessionSlug(name) : slug,
       name,
       label: slug,
       created: Math.floor(this.now() / 1000),
       attached: 0,
       managed: true,
       available: true,
+      ...(this.plan.discovery === 'all' ? {kind: 'local' as const} : {}),
     };
+  }
+
+  private async localHome(): Promise<string> {
+    const output = (
+      await this.connection.run('tmux show-environment -g HOME')
+    ).trim();
+    if (!output.startsWith('HOME=') || output.length === 5) {
+      throw new Error('the host tmux server does not have HOME in its global environment');
+    }
+    return output.slice(5);
   }
 }
