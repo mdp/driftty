@@ -4,12 +4,12 @@ import {spawnSync} from 'node:child_process';
 import {join} from 'node:path';
 
 const root = join(import.meta.dirname, '..');
-const installer = join(root, 'scripts/install-local.sh');
-const source = readFileSync(installer, 'utf8');
+const serveLocal = join(root, 'scripts/serve-local.sh');
+const source = readFileSync(serveLocal, 'utf8');
 
-describe('local tmux installer', () => {
+describe('local tmux serve script', () => {
   test('is valid POSIX shell', () => {
-    const result = spawnSync('sh', ['-n', installer], {encoding: 'utf8'});
+    const result = spawnSync('sh', ['-n', serveLocal], {encoding: 'utf8'});
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
   });
