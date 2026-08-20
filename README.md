@@ -81,8 +81,33 @@ The demo endpoint has no authentication. Keep the published port bound to
 
 ## Quick start: local tmux
 
-On a Linux host, make sure your user has a running tmux server, build the
-gateway, and mount that server's socket:
+On a Linux host with Docker and tmux installed, inspect and then run the
+installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mdp/driftty/main/scripts/install-local.sh
+curl -fsSL https://raw.githubusercontent.com/mdp/driftty/main/scripts/install-local.sh | sh
+```
+
+It starts a `main` tmux session when necessary, pulls or updates the gateway
+image, checks that the container's tmux client can talk to the host server,
+starts `driftty-local`, and prints its password. The password is preserved at
+`~/.config/driftty/local-password` across updates.
+
+The defaults are <http://127.0.0.1:7681> and the `edge` image. To bind it to
+your Tailscale IPv4 on port 31338:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mdp/driftty/main/scripts/install-local.sh |
+  DRIFTTY_BIND="$(tailscale ip -4)" DRIFTTY_PORT=31338 sh
+```
+
+Other overrides include `DRIFTTY_IMAGE`, `DRIFTTY_CONTAINER`,
+`DRIFTTY_TMUX_SESSION`, `DRIFTTY_TMUX_SOCKET_DIR`, and
+`DRIFTTY_STATE_DIR`. Rerunning the installer pulls the selected image and
+replaces the existing gateway container.
+
+To run the same setup manually:
 
 ```bash
 tmux has-session 2>/dev/null || tmux new-session -d -s main
