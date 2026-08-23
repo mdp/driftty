@@ -23,7 +23,13 @@ jobs:
       - run: npm run test:all
       - run: npm run build
       - run: test "$(find dist -maxdepth 1 -name '*.html' | wc -l)" -eq 1
-      - run: CLOUDFLARE_TUNNEL_TOKEN=validation docker compose config --quiet
+      - name: Validate Compose examples
+        env:
+          CLOUDFLARE_TUNNEL_TOKEN: validation
+          DRIFTTY_PASSWORD: validation
+        run: |
+          docker compose config --quiet
+          docker compose -f examples/cloudflare-ssh/compose.yaml config --quiet
       - name: Build images
         run: |
           docker build --target generic -t driftty:test .

@@ -1,0 +1,48 @@
+name: driftty-cloudflare-ssh
+
+services:
+  gateway:
+    image: ghcr.io/mdp/driftty-gateway:${DRIFTTY_TAG:-latest}
+    environment:
+      DRIFTTY_PASSWORD: "${DRIFTTY_PASSWORD:?Set DRIFTTY_PASSWORD in .env}"
+    volumes:
+      - ./profiles.yaml:/config/profiles.yaml:ro
+      - ./keys:/keys:ro
+      - known-hosts:/known-hosts
+    expose:
+      - "7681"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:7681/_health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks: [terminal]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --token
+      - "${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in .env}"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [terminal]
+
+  keygen:
+    image: ghcr.io/mdp/driftty-gateway:${DRIFTTY_TAG:-latest}
+    entrypoint: ["/usr/local/bin/driftty-keygen"]
+    volumes:
+      - ./keys:/keys
+    profiles: [tools]
+
+volumes:
+  known-hosts:
+
+networks:
+  terminal:

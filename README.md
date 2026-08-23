@@ -194,6 +194,62 @@ is ready to configure: SSH configuration and private keys are mounted
 read-only, learned host keys live in a named Docker volume, and the key
 generator is the only process given writable access to the keys directory.
 
+### Server example: Cloudflare Tunnel to an SSH host
+
+[`examples/cloudflare-ssh`](./examples/cloudflare-ssh) is a copyable Compose
+setup for hosting driftty at a Cloudflare-managed HTTPS hostname and opening
+tmux sessions over SSH on `example.com`. The gateway does not publish a host
+port; `cloudflared` reaches it only over the Compose network.
+
+Copy the example to the server where Docker Compose will run:
+
+```bash
+cp -R examples/cloudflare-ssh driftty-server
+cd driftty-server
+cp .env.example .env
+```
+
+Then set it up:
+
+1. Edit `profiles.yaml`. Replace `example.com`, `your-user`, and both
+   `/home/your-user` values with the SSH host, user, and home directory. The
+   SSH server needs tmux installed. Change or remove the `sessions` and
+   `new_sessions` blocks if you want different session behavior.
+2. Put a long random value in `DRIFTTY_PASSWORD` in `.env`. This is the master
+   password for the driftty web login. For example, generate one with
+   `openssl rand -base64 32`.
+3. Generate the dedicated SSH key, then install its public half on the target:
+
+   ```bash
+   docker compose run --rm keygen example
+   ssh-copy-id -i keys/example.pub -p 22 your-user@example.com
+   ```
+
+4. In the Cloudflare dashboard, create a remotely managed tunnel. Add a
+   published application such as `terminal.example.net` and set its service
+   URL to `http://gateway:7681`. Copy the tunnel token into
+   `CLOUDFLARE_TUNNEL_TOKEN` in `.env`. Cloudflare must manage the public
+   hostname's DNS zone.
+5. Validate and start the stack:
+
+   ```bash
+   docker compose config --quiet
+   docker compose up -d
+   docker compose ps
+   docker compose logs cloudflared
+   ```
+
+Open the configured HTTPS hostname and sign in with `DRIFTTY_PASSWORD`.
+`docker compose pull && docker compose up -d` updates and recreates the
+services. Back up `.env` and `keys/`; the named `known-hosts` volume can be
+relearned, but a changed host key is rejected until you deliberately remove
+the old entry.
+
+The tunnel token authorizes a connector for that Cloudflare tunnel, and the
+driftty password grants browser users terminal access equivalent to the SSH
+user. Protect both secrets. Cloudflare documents the current dashboard flow in
+its [remotely managed tunnel guide](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/).
+
 ### Configure hosts and shells
 
 A profile can open a direct SSH shell, expose pinned tmux sessions, allow new
