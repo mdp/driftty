@@ -1,8 +1,11 @@
 import {readFile, mkdir} from 'node:fs/promises';
 import {dirname} from 'node:path';
 import {
+  combineGatewayPlans,
+  localTmuxGatewayPlan,
   parseGatewayPlan,
-  type RemoteShellRegistryPlan,
+  validateLocalTmuxSocket,
+  type ShellRegistryPlan,
 } from './gateway-plan';
 import {
   pickerResponse,
@@ -15,24 +18,49 @@ import {
   type RemoteShellSnapshot,
 } from './remote-shell-registry';
 import {sshCommand, SshConnection} from './ssh';
+import {authResponse, configureAuth, loginResponse, logoutResponse} from './auth';
+import {randomSessionName} from './names';
 import {
   TerminalRoutes,
   type RemoteTerminalTarget,
 } from './terminal-routes';
+import {LocalTmuxConnection} from './local-tmux';
+import {parseGatewayStartupOptions} from './startup-options';
 
 const configPath = process.env.PROFILES_FILE ?? '/config/profiles.yaml';
 const knownHosts = process.env.KNOWN_HOSTS_FILE ?? '/known-hosts/known_hosts';
 const ttydStartPort = 7800;
 const pickerPort = 7799;
+const startup = parseGatewayStartupOptions(process.argv.slice(2));
+const authStartup = configureAuth(startup.authArguments, process.env);
+const auth = authStartup.auth;
 
-await mkdir(dirname(knownHosts), {recursive: true});
-const plan = await parseGatewayPlan(await readFile(configPath, 'utf8'));
+if (authStartup.message) console.warn(authStartup.message);
+
+const plans = [];
+if (startup.localTmux) {
+  await validateLocalTmuxSocket(startup.localTmux);
+  plans.push(localTmuxGatewayPlan(startup.localTmux));
+}
+try {
+  plans.push(await parseGatewayPlan(await readFile(configPath, 'utf8')));
+} catch (error) {
+  const missingConfig = error && typeof error === 'object' &&
+    'code' in error && error.code === 'ENOENT';
+  if (!startup.localTmux || !missingConfig) throw error;
+}
+const plan = combineGatewayPlans(...plans);
+if (plan.instructions.some(({kind}) => kind !== 'local-registry')) {
+  await mkdir(dirname(knownHosts), {recursive: true});
+}
 const registries = new Map(
   plan.registries.map((instruction) => [
     instruction.view.slug,
     new RemoteShellRegistry(
       instruction,
-      new SshConnection(instruction.target, knownHosts),
+      instruction.kind === 'local-registry'
+        ? new LocalTmuxConnection(instruction.socket)
+        : new SshConnection(instruction.target, knownHosts),
     ),
   ]),
 );
@@ -40,11 +68,12 @@ let stopping = false;
 const terminalRoutes = new TerminalRoutes({
   pickerPort,
   startPort: ttydStartPort,
+  authEnabled: auth.enabled,
   onFatal: stop,
 });
 
 function terminalTarget(
-  instruction: RemoteShellRegistryPlan,
+  instruction: ShellRegistryPlan,
   registry: RemoteShellRegistry,
   shell: RemoteShell,
 ): RemoteTerminalTarget {
@@ -57,7 +86,7 @@ function terminalTarget(
 }
 
 async function discover(
-  instruction: RemoteShellRegistryPlan,
+  instruction: ShellRegistryPlan,
   registry: RemoteShellRegistry,
 ): Promise<RemoteShellSnapshot> {
   const snapshot = await registry.discover();
@@ -105,6 +134,16 @@ const picker = Bun.serve({
   port: pickerPort,
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === '/_auth') {
+      return authResponse(request, auth);
+    }
+    if (url.pathname === '/login') return loginResponse(request, auth);
+    if (url.pathname === '/logout') {
+      return auth.enabled
+        ? logoutResponse(request)
+        : new Response(null, {status: 303, headers: {location: '/'}});
+    }
+    if (url.pathname === '/_health') return new Response('ok');
     if (url.pathname === '/') {
       if (request.method !== 'GET') {
         return new Response('Method not allowed', {status: 405});
@@ -126,12 +165,20 @@ const picker = Bun.serve({
           sessionsByProfile.set(instruction.view.slug, registry.unavailable());
         }
       }));
-      return pickerResponse(plan.views, sessionsByProfile);
+      return pickerResponse(
+        plan.views,
+        sessionsByProfile,
+        randomSessionName,
+        auth.enabled,
+      );
     }
 
     const parts = url.pathname.split('/').filter(Boolean);
     const instruction = parts[0] ? plan.get(parts[0]) : undefined;
-    if (!instruction || instruction.kind !== 'registry') {
+    if (
+      !instruction ||
+      (instruction.kind !== 'registry' && instruction.kind !== 'local-registry')
+    ) {
       return new Response('Not found', {status: 404});
     }
     const registry = registries.get(instruction.view.slug)!;
@@ -157,7 +204,7 @@ const picker = Bun.serve({
       } catch (error) {
         const detail =
           error instanceof Error ? error.message : 'Could not create session';
-        return unavailableResponse(instruction.view, detail);
+        return unavailableResponse(instruction.view, detail, auth.enabled);
       }
     }
 
@@ -171,6 +218,7 @@ const picker = Bun.serve({
           instruction.view,
           snapshot.visible,
           url.searchParams.get('ended') ?? undefined,
+          auth.enabled,
         );
       }
 
@@ -197,7 +245,7 @@ const picker = Bun.serve({
     } catch (error) {
       const detail =
         error instanceof Error ? error.message : 'Could not reach host';
-      return unavailableResponse(instruction.view, detail);
+      return unavailableResponse(instruction.view, detail, auth.enabled);
     }
     return new Response('Not found', {status: 404});
   },

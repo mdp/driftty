@@ -1,0 +1,15 @@
+profiles:
+  - slug: example
+    label: Example server
+    host: example.com
+    port: 22
+    user: your-user
+    key: example
+    sessions:
+      - name: main
+        label: Main terminal
+        directory: /home/your-user
+    new_sessions:
+      enabled: true
+      directory: /home/your-user
+      prefix: driftty-

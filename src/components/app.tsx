@@ -6,7 +6,7 @@ import type { ITerminalOptions, ITheme } from '@xterm/xterm';
 import type { ClientOptions, FlowControl } from './terminal/xterm';
 import {initialFontSize} from '../font-size';
 import {initialAutoReconnect} from '../reconnect';
-import {detectViewerProfile} from '../viewer-profile';
+import {detectClientProfile} from '../client-profile';
 
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const path = window.location.pathname.replace(/[/]+$/, '');
@@ -25,7 +25,6 @@ const tokenUrl = [
   path,
   '/token',
 ].join('');
-
 const clientOptions = {
   rendererType: 'webgl',
   disableLeaveAlert: false,
@@ -36,9 +35,9 @@ const clientOptions = {
   isWindows: false,
   unicodeVersion: '11',
 } as ClientOptions;
-const viewer = detectViewerProfile();
+const client = detectClientProfile();
 const termOptions = {
-  fontSize: initialFontSize(viewer),
+  fontSize: initialFontSize(client),
   fontFamily:
     '"JetBrains Mono Nerd Font", ui-monospace, SFMono-Regular, Menlo, monospace',
   theme: {
@@ -82,7 +81,7 @@ export class App extends Component {
         clientOptions={clientOptions}
         termOptions={termOptions}
         flowControl={flowControl}
-        viewer={viewer}
+        client={client}
       />
     );
   }

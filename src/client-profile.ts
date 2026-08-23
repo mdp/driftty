@@ -1,9 +1,9 @@
-export type ViewerFormFactor = 'desktop' | 'mobile';
-export type ViewerOS = 'ios' | 'android' | 'macos' | 'windows' | 'linux' | 'other';
+export type ClientFormFactor = 'desktop' | 'mobile';
+export type ClientOS = 'ios' | 'android' | 'macos' | 'windows' | 'linux' | 'other';
 
-export interface ViewerProfile {
-  formFactor: ViewerFormFactor;
-  os: ViewerOS;
+export interface ClientProfile {
+  formFactor: ClientFormFactor;
+  os: ClientOS;
   touch: boolean;
   finePointer: boolean;
 }
@@ -12,22 +12,22 @@ interface NavigatorLike {
   maxTouchPoints?: number;
 }
 
-export function detectViewerProfile(
+export function detectClientProfile(
   navigatorLike: NavigatorLike = typeof navigator === 'undefined' ? {} : navigator,
   finePointer = typeof matchMedia !== 'undefined'
     ? matchMedia('(any-pointer: fine)').matches
     : false,
-): ViewerProfile {
+): ClientProfile {
   const userAgent = navigatorLike.userAgent ?? '';
   const touch = (navigatorLike.maxTouchPoints ?? 0) > 0;
   const ipadOS = /Macintosh/i.test(userAgent) && touch && !finePointer;
   const ios = /iPad|iPhone|iPod/i.test(userAgent) || ipadOS;
   const android = /Android/i.test(userAgent);
   const mobileUserAgent = /Mobi|Mobile/i.test(userAgent);
-  const formFactor: ViewerFormFactor =
+  const formFactor: ClientFormFactor =
     ios || android || (mobileUserAgent && !finePointer) ? 'mobile' : 'desktop';
 
-  let os: ViewerOS = 'other';
+  let os: ClientOS = 'other';
   if (ios) os = 'ios';
   else if (android) os = 'android';
   else if (/Windows/i.test(userAgent)) os = 'windows';

@@ -8,6 +8,27 @@ const profile = (slug: string, port: number): LegacyRoute => ({
 });
 
 describe('generated Caddy configuration', () => {
+  test('authenticates every product route with only login, logout, and health public', () => {
+    const config = caddyConfig([profile('baz', 7800)], []);
+    expect(config).toContain('\troute {');
+    expect(config).toContain('forward_auth @protected 127.0.0.1:7799');
+    expect(config).toContain('uri /_auth');
+    expect(config).toContain('@health path /_health');
+    expect(config).toContain('@login path /login');
+    expect(config).toContain('@logout path /logout');
+    expect(config).toContain(
+      'header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}',
+    );
+    expect(config.indexOf('forward_auth')).toBeLessThan(config.indexOf('redir @bazBare'));
+  });
+
+  test('omits the auth check when authentication is explicitly disabled', () => {
+    const config = caddyConfig([], [], 7799, false);
+
+    expect(config).not.toContain('forward_auth');
+    expect(config).toContain('handle {');
+  });
+
   test('routes prefixed HTTP, token, and websocket requests without stripping paths', () => {
     const config = caddyConfig([profile('baz', 7800), profile('qux', 7801)], []);
     expect(config).toContain('handle /baz/*');

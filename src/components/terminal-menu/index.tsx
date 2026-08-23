@@ -20,6 +20,7 @@ interface Props {
   onClose: () => void;
   onControl?: (character: string) => void;
   onOpenComposer: () => void;
+  onStartCopySelection?: () => void;
   onOpenKeyboard: () => void;
   onReconnect: () => void;
   onResetQuickbar?: () => void;
@@ -69,6 +70,7 @@ export class TerminalMenu extends Component<Props> {
     onClose,
     onControl,
     onOpenComposer,
+    onStartCopySelection,
     onOpenKeyboard,
     onReconnect,
     onResetQuickbar,
@@ -142,6 +144,19 @@ export class TerminalMenu extends Component<Props> {
               {draftAvailable ? '•' : '›'}
             </span>
           </button>
+          {onStartCopySelection && (
+            <button
+              type="button"
+              onClick={() => {
+                onStartCopySelection();
+                onClose();
+              }}
+              aria-label="Start rectangular copy selection"
+            >
+              <span>Rectangular copy</span>
+              <span aria-hidden="true">Ctrl/⌘ Alt X</span>
+            </button>
+          )}
         </nav>
 
         {mobile && onTerminalAction && (

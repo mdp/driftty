@@ -44,6 +44,12 @@ function createSessionControl(
   </details>`;
 }
 
+function authLink(authEnabled: boolean): string {
+  return authEnabled
+    ? '<a href="/logout" style="color:#73f7ff">Sign out</a>'
+    : '';
+}
+
 function profileCard(profile: GatewayProfileView, index: number): string {
   return `<a class="host" href="/${profile.slug}/">
     <span class="number">${String(index + 1).padStart(2, '0')}</span>
@@ -52,7 +58,10 @@ function profileCard(profile: GatewayProfileView, index: number): string {
   </a>`;
 }
 
-function sessionCard(profile: GatewayProfileView, session: RemoteShell): string {
+function sessionCard(
+  profile: GatewayProfileView,
+  session: RemoteShell,
+): string {
   const date = session.created
     ? new Date(session.created * 1000).toLocaleString('en-CA', {
       year: 'numeric', month: '2-digit', day: '2-digit',
@@ -63,7 +72,7 @@ function sessionCard(profile: GatewayProfileView, session: RemoteShell): string 
     ? `attached ×${session.attached}`
     : 'detached';
   return `<a class="session" href="/${profile.slug}/${session.slug}/">
-    <span class="number">${session.managed ? 'NEW' : 'PIN'}</span>
+    <span class="number">${session.kind === 'local' ? 'TMX' : session.managed ? 'NEW' : 'PIN'}</span>
     <span><span class="label">${escapeHtml(session.label)}</span>
       <span class="meta">${escapeHtml(date)} · ${status}</span></span>
     <span class="arrow">›</span>
@@ -74,6 +83,7 @@ export function pickerResponse(
   profiles: GatewayProfileView[],
   sessionsByProfile: ReadonlyMap<string, RemoteShell[]> = new Map(),
   generateName: () => string = randomSessionName,
+  authEnabled = false,
 ): Response {
   const groups = new Map<string, GatewayProfileView[]>();
   for (const profile of profiles) {
@@ -104,14 +114,16 @@ export function pickerResponse(
   }).join('');
 
   return page('Select terminal',
-    `<div class="eyebrow">gateway online</div><h1>Select<br>terminal</h1>${hostGroups}`);
+    `<div class="eyebrow">gateway online</div><div style="text-align:right">${authLink(authEnabled)}</div><h1>Select<br>terminal</h1>${hostGroups}`);
 }
 
 export function sessionsResponse(
   profile: GatewayProfileView,
   sessions: RemoteShell[],
   ended?: string,
+  authEnabled = false,
 ): Response {
+  const local = profile.localTmux === true;
   const fixed = sessions.filter((session) => !session.managed);
   const managed = sessions.filter((session) => session.managed);
   const create = profile.canCreateSessions
@@ -123,25 +135,35 @@ export function sessionsResponse(
   const fixedCards = fixed.length
     ? fixed.map((session) => sessionCard(profile, session)).join('')
     : '<div class="empty">No pinned sessions are running.</div>';
-  const managedSection = profile.canCreateSessions
+  const managedSection = profile.canCreateSessions && !local
     ? `<div class="section">New sessions</div><div class="sessions">${
       managed.length
         ? managed.map((session) => sessionCard(profile, session)).join('')
         : '<div class="empty">Create a session with the + button.</div>'
     }</div>`
     : '';
+  const localSection = local
+    ? `<div class="section">tmux sessions</div><div class="sessions">${
+      sessions.length
+        ? sessions.map((session) => sessionCard(profile, session)).join('')
+        : '<div class="empty">No tmux sessions are running.</div>'
+    }</div>`
+    : '';
 
   return page(profile.label, `<div class="eyebrow">host online</div>
+    <div style="text-align:right">${authLink(authEnabled)}</div>
     <div class="heading"><h1>${escapeHtml(profile.label)}</h1>${create}</div>
-    ${notice}<div class="section">Pinned</div><div class="sessions">${fixedCards}</div>
+    ${notice}${localSection}${local ? '' : `<div class="section">Pinned</div><div class="sessions">${fixedCards}</div>`}
     ${managedSection}`);
 }
 
 export function unavailableResponse(
   profile: GatewayProfileView,
   detail: string,
+  authEnabled = false,
 ): Response {
   return page(`${profile.label} unavailable`, `<div class="eyebrow">host unavailable</div>
+    <div style="text-align:right">${authLink(authEnabled)}</div>
     <h1>${escapeHtml(profile.label)}</h1>
     <div class="notice">${escapeHtml(detail)}</div>
     <a class="host" href="/"><span class="number">←</span><span class="label">Back to hosts</span><span class="arrow">›</span></a>`);

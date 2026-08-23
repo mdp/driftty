@@ -1,4 +1,4 @@
-import {access} from 'node:fs/promises';
+import {access, stat} from 'node:fs/promises';
 import {constants} from 'node:fs';
 import {basename, join} from 'node:path';
 import {parse} from 'yaml';
@@ -10,6 +10,7 @@ export interface GatewayProfileView {
   hostGroup: string;
   mode: 'direct' | 'registry';
   canCreateSessions: boolean;
+  localTmux?: boolean;
 }
 
 export interface SshTarget {
@@ -50,7 +51,20 @@ export interface RemoteShellRegistryPlan {
   managed?: ManagedShellPlan;
 }
 
-export type GatewayInstruction = DirectShellPlan | RemoteShellRegistryPlan;
+export interface LocalShellRegistryPlan {
+  kind: 'local-registry';
+  view: GatewayProfileView;
+  socket: string;
+  fixed: FixedShellPlan[];
+  managed: ManagedShellPlan;
+  discovery: 'all';
+}
+
+export type ShellRegistryPlan =
+  | RemoteShellRegistryPlan
+  | LocalShellRegistryPlan;
+
+export type GatewayInstruction = DirectShellPlan | ShellRegistryPlan;
 
 interface LoadOptions {
   keysDir?: string;
@@ -58,18 +72,29 @@ interface LoadOptions {
 }
 
 export class GatewayPlan {
+  readonly instructions: GatewayInstruction[];
   readonly views: GatewayProfileView[];
   readonly direct: DirectShellPlan[];
-  readonly registries: RemoteShellRegistryPlan[];
+  readonly registries: ShellRegistryPlan[];
   private readonly bySlug: ReadonlyMap<string, GatewayInstruction>;
 
   constructor(instructions: GatewayInstruction[]) {
+    const slugs = new Set<string>();
+    for (const instruction of instructions) {
+      if (slugs.has(instruction.view.slug)) {
+        throw new Error(`duplicate profile slug: ${instruction.view.slug}`);
+      }
+      slugs.add(instruction.view.slug);
+    }
+    this.instructions = instructions;
     this.views = instructions.map(({view}) => view);
     this.direct = instructions.flatMap((instruction) =>
       instruction.kind === 'direct' ? [instruction] : []
     );
     this.registries = instructions.flatMap((instruction) =>
-      instruction.kind === 'registry' ? [instruction] : []
+      instruction.kind === 'registry' || instruction.kind === 'local-registry'
+        ? [instruction]
+        : []
     );
     this.bySlug = new Map(
       instructions.map((instruction) => [instruction.view.slug, instruction]),
@@ -78,6 +103,45 @@ export class GatewayPlan {
 
   get(slug: string): GatewayInstruction | undefined {
     return this.bySlug.get(slug);
+  }
+}
+
+export function combineGatewayPlans(...plans: GatewayPlan[]): GatewayPlan {
+  return new GatewayPlan(plans.flatMap(({instructions}) => instructions));
+}
+
+export function localTmuxGatewayPlan(socket: string): GatewayPlan {
+  const view: GatewayProfileView = {
+    slug: 'local',
+    label: 'Local tmux',
+    hostLabel: 'Local tmux',
+    hostGroup: 'local-tmux',
+    mode: 'registry',
+    canCreateSessions: true,
+    localTmux: true,
+  };
+  return new GatewayPlan([{
+    kind: 'local-registry',
+    view,
+    socket,
+    fixed: [],
+    managed: {prefix: 'driftty-'},
+    discovery: 'all',
+  }]);
+}
+
+export async function validateLocalTmuxSocket(socket: string): Promise<void> {
+  let details;
+  try {
+    details = await stat(socket);
+  } catch {
+    throw new Error(
+      `local tmux socket does not exist: ${socket}. ` +
+      'Start tmux on the host, mount its socket directory, and pass the mounted socket path to --local-tmux.',
+    );
+  }
+  if (!details.isSocket()) {
+    throw new Error(`local tmux path is not a Unix socket: ${socket}`);
   }
 }
 

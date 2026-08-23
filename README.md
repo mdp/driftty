@@ -79,13 +79,86 @@ docker run --rm \
 The demo endpoint has no authentication. Keep the published port bound to
 `127.0.0.1` and do not expose it to an untrusted network.
 
+## Quick start: local tmux
+
+On a Linux host with Docker and tmux installed, inspect and then run the local
+serve script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mdp/driftty/main/scripts/serve-local.sh
+curl -fsSL https://raw.githubusercontent.com/mdp/driftty/main/scripts/serve-local.sh | sh
+```
+
+It starts a `main` tmux session when necessary, pulls or updates the gateway
+image, checks that the container's tmux client can talk to the host server,
+starts `driftty-local`, and prints its password. The password is preserved at
+`~/.config/driftty/local-password` across updates.
+
+The defaults are <http://127.0.0.1:7681> and the `edge` image. To serve on
+your Tailscale IPv4 using the same port:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mdp/driftty/main/scripts/serve-local.sh |
+  DRIFTTY_BIND="$(tailscale ip -4)" sh
+```
+
+Other overrides include `DRIFTTY_IMAGE`, `DRIFTTY_CONTAINER`,
+`DRIFTTY_TMUX_SESSION`, `DRIFTTY_TMUX_SOCKET_DIR`, and
+`DRIFTTY_STATE_DIR`. Rerunning the serve script pulls the selected image and
+replaces the existing gateway container.
+
+To run the same setup manually:
+
+```bash
+tmux has-session 2>/dev/null || tmux new-session -d -s main
+docker build --target gateway -t driftty-gateway:local .
+
+docker run --rm --name driftty-local \
+  -p 127.0.0.1:7681:7681 \
+  -v "/tmp/tmux-$(id -u):/run/host-tmux:ro" \
+  driftty-gateway:local \
+  --local-tmux /run/host-tmux/default
+```
+
+The foreground log prints a generated master password. Open
+<http://localhost:7681>, sign in, and choose any tmux session. The **+** button
+creates a host session named `driftty-<name>`. Commands and new shells run as
+the host user through the host tmux server; only the tmux client runs in Docker.
+
+At least one tmux session must remain alive to keep the default server and
+socket running. For detached gateway operation, add
+`-d --restart unless-stopped` and retrieve the generated password with
+`docker logs driftty-local`.
+
+This needs a Linux host using tmux's default
+`/tmp/tmux-$(id -u)/default` socket, or an equivalent explicit source mount.
+macOS Docker Desktop cannot expose its host tmux socket this way. Socket access
+is effectively host-user shell access, so keep the loopback port binding unless
+you put the gateway on a trusted network. Publishing with `-p 7681:7681`
+listens on all interfaces and is plaintext HTTP until a TLS tunnel or reverse
+proxy protects it.
+
+Local tmux and SSH profiles can be used independently or together:
+
+- Local only: use the command above; no profile file or SSH keys are needed.
+- SSH only: use the normal Compose/configuration flow below without
+  `--local-tmux`.
+- Both: run the configured gateway with its usual `/config`, `/keys`, and
+  known-hosts mounts, add the tmux socket mount, and append
+  `--local-tmux /run/host-tmux/default` to its command.
+
+When `--local-tmux` is present, the gateway adds the built-in **Local tmux**
+entry to any readable `profiles.yaml`. If that file is absent, it starts in
+local-only mode. The configured profile slug `local` is reserved when both
+modes are enabled.
+
 ## Installation: install the SSH gateway
 
 > **Alpha software and security warning:** driftty is very early-stage software.
-> The gateway does **not** provide authentication or access control. The person
-> operating it is responsible for putting it behind an authenticated tunnel,
-> reverse proxy, VPN, or other trusted access boundary before exposing it to a
-> network. Do not publish the gateway directly to the internet.
+> The gateway protects every terminal with one master password, but it does not
+> provide rate limiting or multi-user accounts. Publish it only through an HTTPS
+> tunnel or reverse proxy, and choose a strong password if you replace the
+> generated one.
 
 For real, long-lived access to your own shells, install the gateway. Download
 the gateway bundle from the latest GitHub release, unpack it, and run:
@@ -104,10 +177,78 @@ Then:
 4. Point the Cloudflare tunnel origin to `http://gateway:7681`.
 5. Start the gateway with `docker compose up -d`.
 
+On each unconfigured start, the gateway generates a new 192-bit URL-safe master
+password. Retrieve it after starting the stack:
+
+```bash
+docker compose logs gateway
+```
+
+The generated password changes whenever the gateway process restarts, which
+also signs every browser out. For a stable password and sessions that survive
+gateway restarts, uncomment `DRIFTTY_PASSWORD` in `.env`, set it to a strong
+value, and restart the gateway. The configured value is not printed to logs.
+
 Each gateway bundle pins the gateway image to the matching driftty version and
 is ready to configure: SSH configuration and private keys are mounted
 read-only, learned host keys live in a named Docker volume, and the key
 generator is the only process given writable access to the keys directory.
+
+### Server example: Cloudflare Tunnel to an SSH host
+
+[`examples/cloudflare-ssh`](./examples/cloudflare-ssh) is a copyable Compose
+setup for hosting driftty at a Cloudflare-managed HTTPS hostname and opening
+tmux sessions over SSH on `example.com`. The gateway does not publish a host
+port; `cloudflared` reaches it only over the Compose network.
+
+Copy the example to the server where Docker Compose will run:
+
+```bash
+cp -R examples/cloudflare-ssh driftty-server
+cd driftty-server
+cp .env.example .env
+```
+
+Then set it up:
+
+1. Edit `profiles.yaml`. Replace `example.com`, `your-user`, and both
+   `/home/your-user` values with the SSH host, user, and home directory. The
+   SSH server needs tmux installed. Change or remove the `sessions` and
+   `new_sessions` blocks if you want different session behavior.
+2. Put a long random value in `DRIFTTY_PASSWORD` in `.env`. This is the master
+   password for the driftty web login. For example, generate one with
+   `openssl rand -base64 32`.
+3. Generate the dedicated SSH key, then install its public half on the target:
+
+   ```bash
+   docker compose run --rm keygen example
+   ssh-copy-id -i keys/example.pub -p 22 your-user@example.com
+   ```
+
+4. In the Cloudflare dashboard, create a remotely managed tunnel. Add a
+   published application such as `terminal.example.net` and set its service
+   URL to `http://gateway:7681`. Copy the tunnel token into
+   `CLOUDFLARE_TUNNEL_TOKEN` in `.env`. Cloudflare must manage the public
+   hostname's DNS zone.
+5. Validate and start the stack:
+
+   ```bash
+   docker compose config --quiet
+   docker compose up -d
+   docker compose ps
+   docker compose logs cloudflared
+   ```
+
+Open the configured HTTPS hostname and sign in with `DRIFTTY_PASSWORD`.
+`docker compose pull && docker compose up -d` updates and recreates the
+services. Back up `.env` and `keys/`; the named `known-hosts` volume can be
+relearned, but a changed host key is rejected until you deliberately remove
+the old entry.
+
+The tunnel token authorizes a connector for that Cloudflare tunnel, and the
+driftty password grants browser users terminal access equivalent to the SSH
+user. Protect both secrets. Cloudflare documents the current dashboard flow in
+its [remotely managed tunnel guide](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/).
 
 ### Configure hosts and shells
 
@@ -216,18 +357,33 @@ The image enables writable input and embeds the complete client at
 
 ### Connection and security model
 
-The gateway does not handle authentication. Authentication and access policy
-are entirely the responsibility of the operator and must be enforced by the
-tunnel or reverse-proxy layer in front of it. Treat the gateway as an internal
-service, not as a public internet-facing application.
+The gateway requires its single master password for the picker and every
+terminal HTTP, asset, token, and WebSocket route. Only `/login`, `/logout`, and
+`/_health` are public. Successful login creates a signed, HTTP-only browser
+session for 30 days. Cookies are marked secure when HTTPS reaches the gateway
+directly or is reported by the tunnel through `X-Forwarded-Proto`.
 
-Each browser connection gets a separate SSH process. Session-routed
-connections attach that process to the selected tmux session.
+The cookie-signing key is derived from the active master password. Keeping the
+same configured `DRIFTTY_PASSWORD` preserves browser sessions across gateway
+restarts; changing it immediately invalidates existing sessions. An
+automatically generated password is intentionally not persisted, so every
+restart rotates the password and invalidates sessions.
+
+For deliberate trusted-network development only, pass `--no-auth` as the
+gateway container command (for example, add `command: ["--no-auth"]` to the
+gateway service). This overrides `DRIFTTY_PASSWORD`, prints a prominent warning,
+and removes login and sign-out controls. Never use this mode on an untrusted
+network.
+
+Each remote browser connection gets a separate SSH process. Local tmux
+connections instead run a tmux client in the gateway container against the
+mounted socket. Session-routed connections attach to the selected tmux session
+in either mode.
 
 SSH uses public-key authentication only, accepts previously unseen host keys,
-and rejects changed keys. Caddy handles internal HTTP and WebSocket routing; it
-does not provide authentication. Configure authentication and access policy at
-the tunnel or reverse-proxy layer.
+and rejects changed keys. Caddy handles internal HTTP and WebSocket routing and
+checks the master-password session before terminal connections. The tunnel must
+terminate HTTPS so passwords and terminal traffic are encrypted in transit.
 
 When a shell exits normally, driftty stops reconnecting and shows an **Exited**
 screen. Unexpected network interruptions use automatic reconnection with
@@ -255,6 +411,7 @@ To run the complete gateway from the current checkout:
 
 ```bash
 docker compose -f compose.local.yaml up --build -d
+docker compose -f compose.local.yaml logs gateway
 ```
 
 This uses the same `config/profiles.yaml`, `keys/`, known-hosts volume, and

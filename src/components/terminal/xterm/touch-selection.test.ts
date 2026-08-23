@@ -36,7 +36,7 @@ function mobileOptions(): XtermOptions {
       autoReconnect: false,
     },
     termOptions: {},
-    viewer: {
+    client: {
       formFactor: 'mobile',
       os: 'other',
       touch: true,

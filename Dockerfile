@@ -58,17 +58,35 @@ CMD []
 
 FROM oven/bun:1-alpine AS bun-runtime
 
+FROM alpine:3.22 AS tmux-legacy
+
+ARG TMUX_LEGACY_VERSION=3.5a
+ARG TMUX_LEGACY_SHA256=16216bd0877170dfcc64157085ba9013610b12b082548c7c9542cc0103198951
+RUN apk add --no-cache build-base bison curl libevent-dev ncurses-dev \
+    && curl -fsSL \
+      "https://github.com/tmux/tmux/releases/download/${TMUX_LEGACY_VERSION}/tmux-${TMUX_LEGACY_VERSION}.tar.gz" \
+      -o "/tmp/tmux-${TMUX_LEGACY_VERSION}.tar.gz" \
+    && echo "${TMUX_LEGACY_SHA256}  /tmp/tmux-${TMUX_LEGACY_VERSION}.tar.gz" \
+      | sha256sum -c - \
+    && tar -xzf "/tmp/tmux-${TMUX_LEGACY_VERSION}.tar.gz" \
+    && cd "tmux-${TMUX_LEGACY_VERSION}" \
+    && ./configure \
+    && make -j"$(getconf _NPROCESSORS_ONLN)"
+
 FROM generic AS gateway
 
-RUN apk add --no-cache caddy openssh-client libstdc++ libgcc
+RUN apk add --no-cache caddy openssh-client libstdc++ libgcc tmux
 COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=tmux-legacy /tmux-3.5a/tmux /usr/local/bin/tmux-3.5a
 WORKDIR /opt/driftty
 COPY gateway/package.json gateway/bun.lock ./
 RUN bun install --production --frozen-lockfile
 COPY gateway/src/ ./src/
 COPY docker/gateway-entrypoint.sh /usr/local/bin/driftty-gateway
 COPY docker/keygen.sh /usr/local/bin/driftty-keygen
-RUN chmod 0755 /usr/local/bin/driftty-gateway /usr/local/bin/driftty-keygen
+COPY docker/local-tmux-wrapper.sh /usr/local/lib/driftty-local/bin/tmux
+RUN chmod 0755 /usr/local/bin/driftty-gateway /usr/local/bin/driftty-keygen \
+    /usr/local/lib/driftty-local/bin/tmux /usr/local/bin/tmux-3.5a
 
 ENTRYPOINT ["/usr/local/bin/driftty-gateway"]
 CMD []

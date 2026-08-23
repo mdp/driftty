@@ -1,5 +1,14 @@
 import {describe, expect, test} from 'bun:test';
-import {parseGatewayPlan} from './gateway-plan';
+import {mkdtemp, rm, writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createServer} from 'node:net';
+import {
+  combineGatewayPlans,
+  localTmuxGatewayPlan,
+  parseGatewayPlan,
+  validateLocalTmuxSocket,
+} from './gateway-plan';
 
 const valid = `profiles:
   - slug: baz
@@ -10,6 +19,64 @@ const valid = `profiles:
 `;
 
 describe('gateway plan', () => {
+  test('constructs local tmux mode without an SSH target or profile file', () => {
+    const plan = localTmuxGatewayPlan('/run/host-tmux/default');
+
+    expect(plan.direct).toEqual([]);
+    expect(plan.views).toEqual([{
+      slug: 'local', label: 'Local tmux', hostLabel: 'Local tmux',
+      hostGroup: 'local-tmux', mode: 'registry', canCreateSessions: true,
+      localTmux: true,
+    }]);
+    expect(plan.registries[0]).toMatchObject({
+      kind: 'local-registry', socket: '/run/host-tmux/default',
+      discovery: 'all', fixed: [], managed: {prefix: 'driftty-'},
+    });
+  });
+
+  test('combines local tmux and SSH profiles', async () => {
+    const ssh = await parseGatewayPlan(valid, {checkKeys: false});
+    const plan = combineGatewayPlans(
+      localTmuxGatewayPlan('/run/host-tmux/default'),
+      ssh,
+    );
+
+    expect(plan.views.map(({slug}) => slug)).toEqual(['local', 'baz']);
+    expect(plan.registries).toHaveLength(1);
+    expect(plan.direct).toHaveLength(1);
+  });
+
+  test('rejects a configured profile that collides with the local route', async () => {
+    const ssh = await parseGatewayPlan(
+      valid.replace('slug: baz', 'slug: local'),
+      {checkKeys: false},
+    );
+    expect(() => combineGatewayPlans(localTmuxGatewayPlan('/tmp/tmux'), ssh))
+      .toThrow('duplicate profile slug: local');
+  });
+
+  test('accepts only an existing Unix socket for local mode', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'driftty-socket-'));
+    const socket = join(root, 'tmux.sock');
+    const regular = join(root, 'regular');
+    const server = createServer();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(socket, resolve);
+      });
+      await writeFile(regular, 'not a socket');
+
+      await expect(validateLocalTmuxSocket(socket)).resolves.toBeUndefined();
+      await expect(validateLocalTmuxSocket(regular)).rejects.toThrow('not a Unix socket');
+      await expect(validateLocalTmuxSocket(join(root, 'missing')))
+        .rejects.toThrow('Start tmux on the host');
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
   test('resolves a direct shell without exposing connection details to its view', async () => {
     const plan = await parseGatewayPlan(valid, {checkKeys: false});
 

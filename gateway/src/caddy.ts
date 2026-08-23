@@ -13,6 +13,7 @@ export function caddyConfig(
   legacyRoutes: LegacyRoute[],
   sessionRoutes: SessionRoute[],
   pickerPort = 7799,
+  authEnabled = true,
 ): string {
   const legacy = legacyRoutes.map((profile) => `
 	@${profile.slug}Bare path /${profile.slug}
@@ -35,17 +36,50 @@ export function caddyConfig(
 		reverse_proxy 127.0.0.1:${route.ttydPort} ${proxyCompressionUpstream()}
 	}`).join('\n');
 
+  const authentication = authEnabled
+    ? `	@protected not path /login /logout /_health
+	forward_auth @protected 127.0.0.1:${pickerPort} {
+		uri /_auth
+	}
+`
+    : '';
+
+  const route = `
+	@health path /_health
+	handle @health {
+		reverse_proxy 127.0.0.1:${pickerPort}
+	}
+
+	@login path /login
+	handle @login {
+		reverse_proxy 127.0.0.1:${pickerPort} {
+			header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
+		}
+	}
+
+	@logout path /logout
+	handle @logout {
+		reverse_proxy 127.0.0.1:${pickerPort} {
+			header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
+		}
+	}
+
+${authentication}${sessions}
+${legacy}
+
+	handle {
+		reverse_proxy 127.0.0.1:${pickerPort} ${proxyCompressionUpstream()}
+	}
+	`;
+
   return `{
 	admin 127.0.0.1:2019
 	auto_https off
 }
 
 http://:7681 {
-${sessions}
-${legacy}
-
-	handle {
-		reverse_proxy 127.0.0.1:${pickerPort} ${proxyCompressionUpstream()}
+	route {
+${indentForRoute(route)}
 	}
 }
 `;
@@ -54,5 +88,12 @@ function proxyCompressionUpstream(): string {
 	return `{
 			header_up -Sec-WebSocket-Extensions
 		}`;
+}
+
+function indentForRoute(source: string): string {
+  return source.replace(/^\n/, '').trimEnd().replace(/\n{3,}/g, '\n\n')
+    .split('\n')
+    .map((line) => line.length > 0 ? `\t${line}` : line)
+    .join('\n');
 }
 }

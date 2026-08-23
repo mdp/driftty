@@ -30,6 +30,7 @@ interface TerminalRouteDependencies {
 
 interface TerminalRoutesOptions {
   onFatal: (exitCode: number) => void;
+  authEnabled?: boolean;
   caddyfile?: string;
   clientPath?: string;
   pickerPort?: number;
@@ -72,6 +73,7 @@ function routeKey(hostSlug: string, sessionSlug: string): string {
 
 export class TerminalRoutes {
   private readonly onFatal: (exitCode: number) => void;
+  private readonly authEnabled: boolean;
   private readonly caddyfile: string;
   private readonly clientPath: string;
   private readonly pickerPort: number;
@@ -92,6 +94,7 @@ export class TerminalRoutes {
 
   constructor({
     onFatal,
+    authEnabled = true,
     caddyfile = '/tmp/driftty.Caddyfile',
     clientPath = '/usr/share/ttyd/index.html',
     pickerPort = 7799,
@@ -101,6 +104,7 @@ export class TerminalRoutes {
     dependencies = {},
   }: TerminalRoutesOptions) {
     this.onFatal = onFatal;
+    this.authEnabled = authEnabled;
     this.caddyfile = caddyfile;
     this.clientPath = clientPath;
     this.pickerPort = pickerPort;
@@ -300,6 +304,7 @@ export class TerminalRoutes {
       this.legacyRoutes,
       [...this.sessionRoutes.values()],
       this.pickerPort,
+      this.authEnabled,
     );
   }
 

@@ -71,7 +71,7 @@ export class Terminal extends Component<Props, State> {
   private layoutHeight = window.innerHeight;
   private layoutWidth = window.innerWidth;
   private quickbarLayoutReady = false;
-  private readonly mobileViewer: boolean;
+  private readonly mobileClient: boolean;
   private ctrlTimer?: number;
   private selectionAdjustment?: {
     type: TouchSelectionAdjustment;
@@ -84,10 +84,10 @@ export class Terminal extends Component<Props, State> {
 
   constructor(props: Props) {
     super();
-    this.mobileViewer = props.viewer.formFactor === 'mobile';
+    this.mobileClient = props.client.formFactor === 'mobile';
     this.xterm = new Xterm(props);
     this.fixedMobileViewport = new FixedMobileViewport({
-      mobile: this.mobileViewer,
+      mobile: this.mobileClient,
       viewportSize: {
         width: window.innerWidth,
         height: window.innerHeight,
@@ -194,8 +194,8 @@ export class Terminal extends Component<Props, State> {
     return (
       <div
         class="terminal-shell"
-        data-viewer={this.props.viewer.formFactor}
-        data-os={this.props.viewer.os}
+        data-client={this.props.client.formFactor}
+        data-os={this.props.client.os}
         style={{
           height: `${viewportHeight}px`,
           transform: `translateY(${viewportOffsetTop}px)`,
@@ -303,7 +303,7 @@ export class Terminal extends Component<Props, State> {
             )}
           </div>
         )}
-        {reconnectRequired && this.mobileViewer && (
+        {reconnectRequired && this.mobileClient && (
           <button
             class="reconnect-button"
             onClick={() => this.xterm.reconnectNow()}
@@ -329,7 +329,7 @@ export class Terminal extends Component<Props, State> {
         {showComposer && (
           <VoiceComposer
             ctrlArmed={ctrlArmed}
-            mobile={this.mobileViewer}
+            mobile={this.mobileClient}
             value={composerValue}
             onChange={this.updateComposer}
             onTerminalAction={this.sendTerminalAction}
@@ -344,10 +344,11 @@ export class Terminal extends Component<Props, State> {
             connectionState={connectionState}
             ctrlArmed={ctrlArmed}
             draftAvailable={Boolean(composerValue)}
-            mobile={this.mobileViewer}
+            mobile={this.mobileClient}
             onClose={this.closeTerminalMenu}
             onControl={this.sendControl}
             onOpenComposer={this.openComposer}
+            onStartCopySelection={this.startCopySelection}
             onOpenKeyboard={this.openKeyboard}
             onReconnect={this.reconnect}
             onResetQuickbar={this.resetQuickbar}
@@ -360,7 +361,7 @@ export class Terminal extends Component<Props, State> {
             onFontSizeChange={this.setFontSize}
           />
         )}
-        {this.mobileViewer &&
+        {this.mobileClient &&
           ui.surface === 'terminal' && (
             <TerminalQuickbar
               ctrlArmed={ctrlArmed}
@@ -382,7 +383,7 @@ export class Terminal extends Component<Props, State> {
               )}
             />
           )}
-        {!this.mobileViewer && !showKeyboard && !showComposer && (
+        {!this.mobileClient && !showKeyboard && !showComposer && (
           <button
             class="keyboard-toggle"
             onMouseDown={(event) => event.preventDefault()}
@@ -511,7 +512,7 @@ export class Terminal extends Component<Props, State> {
   @bind
   closeComposer() {
     this.returnToTerminal(() => {
-      if (!this.mobileViewer) this.xterm.focus();
+      if (!this.mobileClient) this.xterm.focus();
     });
   }
 
@@ -537,7 +538,7 @@ export class Terminal extends Component<Props, State> {
     this.clearCtrl();
     this.returnToTerminal(() => {
       this.setState({composerValue: ''});
-      if (!this.mobileViewer) this.xterm.focus();
+      if (!this.mobileClient) this.xterm.focus();
     });
   }
 
@@ -561,7 +562,7 @@ export class Terminal extends Component<Props, State> {
   closeTerminalMenu() {
     this.clearCtrl();
     this.returnToTerminal(() => {
-      if (!this.mobileViewer) this.xterm.focus();
+      if (!this.mobileClient) this.xterm.focus();
     });
   }
 
@@ -744,7 +745,7 @@ export class Terminal extends Component<Props, State> {
     this.transitionUi({
       type: 'show-surface',
       surface,
-      preservePosition: this.mobileViewer,
+      preservePosition: this.mobileClient,
     });
   }
 
@@ -756,12 +757,12 @@ export class Terminal extends Component<Props, State> {
     this.transitionUi({
       type: 'software-keyboard',
       open,
-      preservePosition: this.mobileViewer,
+      preservePosition: this.mobileClient,
     });
   }
 
   private settleTerminalLayout() {
-    if (this.mobileViewer && !this.quickbarLayoutReady) return;
+    if (this.mobileClient && !this.quickbarLayoutReady) return;
     this.transitionUi({type: 'layout-settled'});
   }
 

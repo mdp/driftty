@@ -23,12 +23,25 @@ jobs:
       - run: npm run test:all
       - run: npm run build
       - run: test "$(find dist -maxdepth 1 -name '*.html' | wc -l)" -eq 1
-      - run: CLOUDFLARE_TUNNEL_TOKEN=validation docker compose config --quiet
+      - name: Validate Compose examples
+        env:
+          CLOUDFLARE_TUNNEL_TOKEN: validation
+          DRIFTTY_PASSWORD: validation
+        run: |
+          docker compose config --quiet
+          docker compose -f examples/cloudflare-ssh/compose.yaml config --quiet
       - name: Build images
         run: |
           docker build --target generic -t driftty:test .
           docker build --target demo -t driftty-demo:test .
           docker build --target gateway -t driftty-gateway:test .
+      - name: Test local tmux gateway
+        env:
+          DRIFTTY_GATEWAY_IMAGE: driftty-gateway:test
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tmux
+          scripts/local-tmux-gateway.integration.test.sh
       - name: Smoke test arbitrary command
         run: |
           id=$(docker run -d -p 17681:7681 driftty:test sh)
