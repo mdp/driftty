@@ -1,0 +1,71 @@
+name: driftty-docker-development
+
+services:
+  development:
+    hostname: driftty-development
+    build:
+      context: .
+      args:
+        DEV_UID: "${DEV_UID:-1000}"
+        DEV_GID: "${DEV_GID:-1000}"
+    volumes:
+      - ../..:/workspace
+      - ./keys/development.pub:/run/driftty/development.pub:ro
+      - ssh-host-keys:/etc/ssh
+    expose:
+      - "22"
+    healthcheck:
+      test: ["CMD-SHELL", "ssh-keyscan -p 22 127.0.0.1 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+    networks: [development]
+
+  gateway:
+    image: driftty-gateway:development
+    build:
+      context: ../..
+      target: gateway
+    environment:
+      DRIFTTY_PASSWORD: "${DRIFTTY_PASSWORD:?Set DRIFTTY_PASSWORD in .env}"
+    volumes:
+      - ./profiles.yaml:/config/profiles.yaml:ro
+      - ./keys:/keys:ro
+      - known-hosts:/known-hosts
+    ports:
+      - "127.0.0.1:${DRIFTTY_PORT:-7681}:7681"
+    depends_on:
+      development:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:7681/_health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks: [development]
+
+  keygen:
+    image: driftty-gateway:development
+    build:
+      context: ../..
+      target: gateway
+    environment:
+      DEV_UID: "${DEV_UID:-1000}"
+      DEV_GID: "${DEV_GID:-1000}"
+    entrypoint: ["/bin/sh", "/usr/local/bin/example-keygen"]
+    volumes:
+      - ./keys:/keys
+      - ./keygen-entrypoint.sh:/usr/local/bin/example-keygen:ro
+    network_mode: none
+    profiles: [tools]
+
+volumes:
+  known-hosts:
+  ssh-host-keys:
+
+networks:
+  development:

@@ -30,6 +30,7 @@ jobs:
         run: |
           docker compose config --quiet
           docker compose -f examples/cloudflare-ssh/compose.yaml config --quiet
+          docker compose -f examples/docker-development/compose.yaml config --quiet
       - name: Build images
         run: |
           docker build --target generic -t driftty:test .
