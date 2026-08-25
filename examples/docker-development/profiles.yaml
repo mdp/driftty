@@ -1,0 +1,15 @@
+profiles:
+  - slug: development
+    label: Docker development
+    host: development
+    port: 22
+    user: node
+    key: development
+    sessions:
+      - name: main
+        label: Main workspace
+        directory: /workspace
+    new_sessions:
+      enabled: true
+      directory: /workspace
+      prefix: driftty-
