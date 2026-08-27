@@ -109,6 +109,12 @@ body {
   clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
 }
 
+.terminal-shell[data-client='desktop'] .reconnect-button {
+  top: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}
+
 .terminal-exited {
   position: absolute;
   inset: 0;

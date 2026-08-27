@@ -135,7 +135,11 @@ export class Xterm {
   private webglAddon?: WebglAddon;
 
   private socket?: WebSocket;
-  private token: string;
+  private socketDisposables: IDisposable[] = [];
+  private tokenRequest?: AbortController;
+  private connectionGeneration = 0;
+  private connectionPending = false;
+  private manualReconnectPending = false;
   private opened = false;
   private title?: string;
   private titleFixed?: string;
@@ -331,12 +335,12 @@ export class Xterm {
     this.disposed = true;
     clearTimeout(this.reconnectTimer);
     this.manualReconnectKey?.dispose();
+    this.cancelConnectionAttempt();
     this.clearListeners();
     for (const disposable of this.selectionGestureDisposables) {
       disposable.dispose();
     }
     this.selectionGestureDisposables.length = 0;
-    this.socket?.close();
   }
 
   public isAutoReconnectEnabled() {
@@ -371,15 +375,18 @@ export class Xterm {
   }
 
   public reconnectNow() {
-    if (this.exited) return;
+    if (this.exited || this.disposed || this.manualReconnectPending) return;
+    this.manualReconnectPending = true;
     clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = undefined;
     this.manualReconnectKey?.dispose();
     this.manualReconnectKey = undefined;
+    this.cancelConnectionAttempt();
     this.reconnectAttempts = 0;
     this.reconnectListener?.(false);
     this.setConnectionState('connecting');
     this.overlayAddon.showOverlay('Reconnecting...');
-    this.refreshToken().then(this.connect);
+    this.connect();
   }
 
   @bind
@@ -389,16 +396,48 @@ export class Xterm {
   }
 
   @bind
-  public async refreshToken() {
-    try {
-      const resp = await fetch(this.options.tokenUrl);
-      if (resp.ok) {
-        const json = await resp.json();
-        this.token = json.token;
-      }
-    } catch (e) {
-      console.error(`[ttyd] fetch ${this.options.tokenUrl}: `, e);
+  public async refreshToken(signal?: AbortSignal): Promise<string> {
+    const resp = await fetch(this.options.tokenUrl, {
+      cache: 'no-store',
+      signal,
+    });
+    if (this.isLoginResponse(resp)) {
+      this.redirectToLogin();
+      throw new Error('Authentication required');
     }
+    if (!resp.ok) {
+      throw new Error(`Token request failed with status ${resp.status}`);
+    }
+
+    const json: unknown = await resp.json();
+    if (
+      typeof json !== 'object' ||
+      json === null ||
+      typeof (json as {token?: unknown}).token !== 'string' ||
+      (json as {token: string}).token.length === 0
+    ) {
+      throw new Error('Token response did not contain a token');
+    }
+    return (json as {token: string}).token;
+  }
+
+  private isLoginResponse(resp: Response): boolean {
+    try {
+      if (
+        resp.url &&
+        new URL(resp.url, window.location.href).pathname === '/login'
+      ) {
+        return true;
+      }
+    } catch {
+      // A malformed response URL is handled as an ordinary token failure.
+    }
+    return resp.headers.get('content-type')?.includes('text/html') ?? false;
+  }
+
+  private redirectToLogin() {
+    const terminalRoute = `${window.location.pathname}${window.location.search}`;
+    window.location.assign(`/login?next=${encodeURIComponent(terminalRoute)}`);
   }
 
   @bind
@@ -467,6 +506,7 @@ export class Xterm {
     this.initTouchSelection();
     this.initTouchScroll();
     fitAddon.fit();
+    this.initListeners();
   }
 
   private initTouchSelection() {
@@ -1017,36 +1057,84 @@ export class Xterm {
     this.terminal.paste(data);
   }
 
-  @bind
   public connect() {
-    if (this.disposed) return;
+    if (this.disposed || this.exited || this.connectionPending) return;
+    this.cancelConnectionAttempt();
+    const generation = ++this.connectionGeneration;
+    this.connectionPending = true;
     this.setConnectionState(
       this.reconnectAttempts > 0 ? 'reconnecting' : 'connecting'
     );
-    this.socket = new WebSocket(this.options.wsUrl, ['tty']);
-    const { socket, register } = this;
-
-    socket.binaryType = 'arraybuffer';
-    register(addEventListener(socket, 'open', this.onSocketOpen));
-    register(
-      addEventListener(socket, 'message', this.onSocketData as EventListener),
-    );
-    register(
-      addEventListener(socket, 'close', this.onSocketClose as EventListener),
-    );
+    void this.connectWithFreshToken(generation);
   }
 
-  @bind
-  private onSocketOpen() {
+  private async connectWithFreshToken(generation: number) {
+    const controller = new AbortController();
+    this.tokenRequest = controller;
+    try {
+      const token = await this.refreshToken(controller.signal);
+      if (!this.isCurrentConnection(generation)) return;
+      this.tokenRequest = undefined;
+
+      const socket = new WebSocket(this.options.wsUrl, ['tty']);
+      this.socket = socket;
+      socket.binaryType = 'arraybuffer';
+      this.socketDisposables = [
+        addEventListener(socket, 'open', () =>
+          this.onSocketOpen(socket, generation, token)),
+        addEventListener(socket, 'message', ((event: MessageEvent) => {
+          if (this.isCurrentSocket(socket, generation)) this.onSocketData(event);
+        }) as EventListener),
+        addEventListener(socket, 'close', ((event: CloseEvent) =>
+          this.onSocketClose(socket, generation, event)) as EventListener),
+      ];
+    } catch (error) {
+      if (
+        !this.isCurrentConnection(generation) ||
+        controller.signal.aborted
+      ) return;
+      this.tokenRequest = undefined;
+      console.error(`[ttyd] fetch ${this.options.tokenUrl}: `, error);
+      this.connectionPending = false;
+      this.handleConnectionFailure(generation);
+    }
+  }
+
+  private isCurrentConnection(generation: number) {
+    return !this.disposed && generation === this.connectionGeneration;
+  }
+
+  private isCurrentSocket(socket: WebSocket, generation: number) {
+    return this.isCurrentConnection(generation) && this.socket === socket;
+  }
+
+  private clearSocketListeners() {
+    for (const disposable of this.socketDisposables) disposable.dispose();
+    this.socketDisposables.length = 0;
+  }
+
+  private cancelConnectionAttempt() {
+    this.connectionGeneration++;
+    this.tokenRequest?.abort();
+    this.tokenRequest = undefined;
+    this.clearSocketListeners();
+    const socket = this.socket;
+    this.socket = undefined;
+    this.connectionPending = false;
+    if (socket && socket.readyState !== WebSocket.CLOSED) socket.close();
+  }
+
+  private onSocketOpen(socket: WebSocket, generation: number, token: string) {
+    if (!this.isCurrentSocket(socket, generation)) return;
     console.log('[ttyd] websocket connection opened');
 
     const { textEncoder, terminal, overlayAddon } = this;
     const msg = JSON.stringify({
-      AuthToken: this.token,
+      AuthToken: token,
       columns: terminal.cols,
       rows: terminal.rows,
     });
-    this.socket?.send(textEncoder.encode(msg));
+    socket.send(textEncoder.encode(msg));
 
     if (this.opened) {
       terminal.reset();
@@ -1058,24 +1146,40 @@ export class Xterm {
     }
 
     this.doReconnect = this.reconnect;
+    this.connectionPending = false;
+    this.manualReconnectPending = false;
     this.reconnectAttempts = 0;
     this.manualReconnectKey?.dispose();
     this.manualReconnectKey = undefined;
     this.reconnectListener?.(false);
     this.setConnectionState('connected');
-    this.initListeners();
     this.focus();
   }
 
-  @bind
-  private onSocketClose(event: CloseEvent) {
+  private onSocketClose(
+    socket: WebSocket,
+    generation: number,
+    event: CloseEvent,
+  ) {
+    if (!this.isCurrentSocket(socket, generation)) return;
     console.log(`[ttyd] websocket connection closed with code: ${event.code}`);
 
-    const { doReconnect, overlayAddon } = this;
-    overlayAddon.showOverlay('Connection Closed');
-    this.clearListeners();
+    this.clearSocketListeners();
+    this.socket = undefined;
+    this.connectionPending = false;
+    this.handleConnectionFailure(generation, event.code);
+  }
 
-    if (!this.disposed && connectionStateAfterClose(event.code) === 'exited') {
+  private handleConnectionFailure(generation: number, closeCode?: number) {
+    if (!this.isCurrentConnection(generation)) return;
+    this.manualReconnectPending = false;
+    const { doReconnect, overlayAddon } = this;
+    overlayAddon.showOverlay('Connection Closed', 1200);
+
+    if (
+      closeCode !== undefined &&
+      connectionStateAfterClose(closeCode) === 'exited'
+    ) {
       clearTimeout(this.reconnectTimer);
       this.exited = true;
       this.doReconnect = false;
@@ -1099,7 +1203,10 @@ export class Xterm {
         `Reconnecting ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`,
       );
       this.reconnectTimer = setTimeout(
-        () => this.refreshToken().then(this.connect),
+        () => {
+          this.reconnectTimer = undefined;
+          this.connect();
+        },
         delay,
       );
     } else if (this.closeOnDisconnect) {
@@ -1116,7 +1223,6 @@ export class Xterm {
         }
       });
       this.reconnectListener?.(true);
-      overlayAddon.showOverlay('Tap Reconnect or press ⏎');
     }
   }
 
