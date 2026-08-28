@@ -989,7 +989,7 @@ export class Xterm {
     register(
       terminal.onResize(({ cols, rows }) => {
         const msg = JSON.stringify({ columns: cols, rows: rows });
-        this.socket?.send(
+        this.sendSocketMessage(
           this.textEncoder.encode(Command.RESIZE_TERMINAL + msg),
         );
         if (this.resizeOverlay)
@@ -1021,13 +1021,13 @@ export class Xterm {
       terminal.write(data, () => {
         this.pending = Math.max(this.pending - 1, 0);
         if (this.pending < lowWater) {
-          this.socket?.send(textEncoder.encode(Command.RESUME));
+          this.sendSocketMessage(textEncoder.encode(Command.RESUME));
         }
       });
       this.pending++;
       this.written = 0;
       if (this.pending > highWater) {
-        this.socket?.send(textEncoder.encode(Command.PAUSE));
+        this.sendSocketMessage(textEncoder.encode(Command.PAUSE));
       }
     } else {
       terminal.write(data);
@@ -1050,6 +1050,12 @@ export class Xterm {
       payload.set(data, 1);
       socket.send(payload);
     }
+  }
+
+  private sendSocketMessage(data: Uint8Array<ArrayBuffer>) {
+    const socket = this.socket;
+    if (socket?.readyState !== WebSocket.OPEN) return;
+    socket.send(data);
   }
 
   public paste(data: string) {

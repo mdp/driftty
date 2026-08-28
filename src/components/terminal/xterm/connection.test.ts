@@ -22,6 +22,9 @@ class FakeWebSocket extends EventTarget {
   }
 
   send(data: unknown) {
+    if (this.readyState === FakeWebSocket.CONNECTING) {
+      throw new DOMException('Still in CONNECTING state', 'InvalidStateError');
+    }
     this.sent.push(data);
   }
 
@@ -99,11 +102,11 @@ async function flushConnection() {
 beforeEach(() => {
   FakeWebSocket.instances = [];
   vi.stubGlobal('WebSocket', FakeWebSocket);
-  vi.stubGlobal('document', {
+  vi.stubGlobal('document', Object.assign(new EventTarget(), {
     createElement: () => Object.assign(new EventTarget(), {style: {}}),
     title: '',
-  });
-  vi.stubGlobal('window', {
+  }));
+  vi.stubGlobal('window', Object.assign(new EventTarget(), {
     location: {
       href: 'https://example.test/host/session/?view=full',
       pathname: '/host/session/',
@@ -113,7 +116,7 @@ beforeEach(() => {
     setTimeout,
     clearTimeout,
     close: vi.fn(),
-  });
+  }));
 });
 
 afterEach(() => {
@@ -198,6 +201,45 @@ describe('terminal connection lifecycle', () => {
     await vi.advanceTimersByTimeAsync(500);
 
     expect(FakeWebSocket.instances).toHaveLength(2);
+    xterm.dispose();
+  });
+
+  it('does not send resize messages while a replacement socket is connecting', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn(async () => tokenResponse('token')));
+    const {xterm} = prepare();
+    let resize: ((size: {cols: number; rows: number}) => void) | undefined;
+    const disposable = () => ({dispose: vi.fn()});
+    const terminal = {
+      ...terminalStub(),
+      element: undefined,
+      getSelection: vi.fn(() => ''),
+      onTitleChange: vi.fn(disposable),
+      onData: vi.fn(disposable),
+      onBinary: vi.fn(disposable),
+      onResize: vi.fn((listener) => {
+        resize = listener;
+        return disposable();
+      }),
+      onSelectionChange: vi.fn(disposable),
+    };
+    Object.assign(xterm as unknown as object, {terminal});
+    (xterm as unknown as {initListeners: () => void}).initListeners();
+
+    xterm.connect();
+    await flushConnection();
+    expect(() => resize?.({cols: 100, rows: 30})).not.toThrow();
+    expect(FakeWebSocket.instances[0].sent).toHaveLength(0);
+
+    FakeWebSocket.instances[0].open();
+    resize?.({cols: 100, rows: 30});
+    expect(FakeWebSocket.instances[0].sent).toHaveLength(2);
+    FakeWebSocket.instances[0].closeWith(1006);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    expect(() => resize?.({cols: 120, rows: 40})).not.toThrow();
+    expect(FakeWebSocket.instances[1].sent).toHaveLength(0);
+    expect(terminal.onResize).toHaveBeenCalledOnce();
     xterm.dispose();
   });
 
