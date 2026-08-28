@@ -54,28 +54,87 @@ jobs:
           curl -fsS http://127.0.0.1:17681/ | grep -q 'terminal-container'
       - name: Smoke test coding CLI demo
         run: |
-          id=$(docker run -d -p 17117:7117 driftty-demo:test)
+          id=$(docker run -d -p 17117:7117 \
+            -e DRIFTTY_DEMO_PASSWORD=smoke-secret \
+            driftty-demo:test)
           trap 'docker rm -f "$id"' EXIT
           for attempt in $(seq 1 30); do
-            curl -fsS http://127.0.0.1:17117/ >/dev/null && break
+            curl -fsS -u driftty:smoke-secret http://127.0.0.1:17117/ >/dev/null && break
             sleep 1
           done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:17117/)" = 401
           node --input-type=module <<'NODE'
-          const token = await fetch('http://127.0.0.1:17117/token')
-            .then((response) => response.json());
-          await new Promise((resolve, reject) => {
-            const socket = new WebSocket('ws://127.0.0.1:17117/ws', ['tty']);
-            socket.addEventListener('open', () => {
-              socket.send(new TextEncoder().encode(JSON.stringify({
-                AuthToken: token.token,
-                columns: 80,
-                rows: 24,
-              })));
-              setTimeout(() => socket.close(), 1000);
+          import {createConnection} from 'node:net';
+          import {randomBytes} from 'node:crypto';
+          const host = '127.0.0.1';
+          const port = 17117;
+          const auth = 'Basic ' + Buffer.from('driftty:smoke-secret').toString('base64');
+          const {token} = await fetch(`http://${host}:${port}/token`, {
+            headers: {authorization: auth},
+          }).then((response) => response.json());
+          const key = randomBytes(16).toString('base64');
+          const socket = createConnection({host, port});
+          const result = await new Promise((resolve, reject) => {
+            const timer = setTimeout(
+              () => reject(new Error('websocket smoke test timed out')),
+              10000,
+            );
+            let buffer = Buffer.alloc(0);
+            let opened = false;
+            socket.on('connect', () => {
+              socket.write(
+                `GET /ws HTTP/1.1\r\n` +
+                `Host: ${host}:${port}\r\n` +
+                `Upgrade: websocket\r\n` +
+                `Connection: Upgrade\r\n` +
+                `Sec-WebSocket-Key: ${key}\r\n` +
+                `Sec-WebSocket-Version: 13\r\n` +
+                `Sec-WebSocket-Protocol: tty\r\n` +
+                `Authorization: ${auth}\r\n\r\n`,
+              );
             });
-            socket.addEventListener('close', resolve);
-            socket.addEventListener('error', reject);
+            socket.on('data', (chunk) => {
+              buffer = Buffer.concat([buffer, chunk]);
+              if (!opened && buffer.includes('\r\n\r\n')) {
+                const end = buffer.indexOf('\r\n\r\n');
+                const status = buffer.slice(0, end).toString().split('\r\n')[0];
+                if (!status.includes('101')) {
+                  reject(new Error(`websocket handshake failed: ${status}`));
+                  return;
+                }
+                buffer = buffer.slice(end + 4);
+                opened = true;
+                const payload = Buffer.from(JSON.stringify({
+                  AuthToken: token,
+                  columns: 80,
+                  rows: 24,
+                }), 'utf8');
+                socket.write(maskedFrame(payload));
+              } else if (opened) {
+                clearTimeout(timer);
+                resolve('attached to terminal');
+                socket.destroy();
+              }
+            });
+            socket.on('error', reject);
           });
+          console.log(result);
+
+          function maskedFrame(payload) {
+            const mask = randomBytes(4);
+            const body = Buffer.from(payload);
+            for (let i = 0; i < body.length; i++) body[i] ^= mask[i % 4];
+            let header;
+            if (body.length < 126) {
+              header = Buffer.from([0x82, 0x80 | body.length]);
+            } else {
+              header = Buffer.alloc(4);
+              header[0] = 0x82;
+              header[1] = 0x80 | 126;
+              header.writeUInt16BE(body.length, 2);
+            }
+            return Buffer.concat([header, mask, body]);
+          }
           NODE
           docker exec "$id" sh -lc '
             test "$(id -u)" = 1000
