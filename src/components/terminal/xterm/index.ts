@@ -413,11 +413,13 @@ export class Xterm {
     if (
       typeof json !== 'object' ||
       json === null ||
-      typeof (json as {token?: unknown}).token !== 'string' ||
-      (json as {token: string}).token.length === 0
+      typeof (json as {token?: unknown}).token !== 'string'
     ) {
       throw new Error('Token response did not contain a token');
     }
+    // ttyd returns `{"token": ""}` when it has no auth of its own (the gateway
+    // relies on Caddy `forward_auth` instead), so an empty token is valid and
+    // the WebSocket should still connect.
     return (json as {token: string}).token;
   }
 

@@ -275,7 +275,6 @@ describe('terminal connection lifecycle', () => {
   it.each([
     new Response('nope', {status: 503}),
     new Response('{', {headers: {'content-type': 'application/json'}}),
-    tokenResponse(''),
   ])('treats invalid token responses as retryable failures', async (response) => {
     vi.useFakeTimers();
     vi.stubGlobal('fetch', vi.fn(async () => response.clone()));
@@ -286,6 +285,22 @@ describe('terminal connection lifecycle', () => {
     expect(FakeWebSocket.instances).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(500);
     expect(fetch).toHaveBeenCalledTimes(2);
+    xterm.dispose();
+  });
+
+  it('accepts an empty token from an unauthenticated ttyd and still connects', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => tokenResponse('')));
+    const {xterm} = prepare();
+
+    xterm.connect();
+    await flushConnection();
+    expect(FakeWebSocket.instances).toHaveLength(1);
+
+    FakeWebSocket.instances[0].open();
+    const authMessage = JSON.parse(
+      new TextDecoder().decode(FakeWebSocket.instances[0].sent[0] as Uint8Array),
+    );
+    expect(authMessage.AuthToken).toBe('');
     xterm.dispose();
   });
 
