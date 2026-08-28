@@ -36,20 +36,25 @@ routing to persistent tmux sessions.
 
 | Goal | Start here |
 | --- | --- |
-| Try the mobile terminal | [Run the demo](#try-the-demo) |
-| Reach tmux on this Linux machine | [Serve local tmux](#serve-local-tmux) |
-| Reach one or more machines over SSH | [Run the SSH gateway](#run-the-ssh-gateway) |
+| Try Cline and OpenCode in a browser | [Run the Docker demo](#run-the-docker-demo) |
+| Reach this machine's tmux from a browser | [Serve your machine's tmux](#serve-your-machines-tmux) |
+| Reach another machine over SSH | [SSH to another machine](#ssh-to-another-machine) |
+
+| Also | Start here |
+| --- | --- |
 | Develop driftty's web client | [Develop the web client](#develop-the-web-client) |
-| Develop against an SSH-accessible Docker workspace | [Use the Docker development host](#use-the-docker-development-host) |
+| Run one small terminal command | [Run one command](#run-one-command) |
+| Deploy a shared gateway with a public URL | [Deploy the gateway in production](#deploy-the-gateway-in-production) |
 
-The terminal, demo, and gateway images all embed the same mobile client. Use
-the small terminal image around one command, or use the gateway when you need a
-login page, host picker, stable URLs, SSH routing, or local tmux discovery.
+All three images embed the same mobile client. The demo and single-command
+images wrap one `ttyd` process, while the gateway adds a login page, host
+picker, stable URLs, SSH routing, and local tmux discovery.
 
-## Try the demo
+## Run the Docker demo
 
-The demo starts one persistent tmux session with tabs for Cline, OpenCode, and
-the project README:
+The demo image starts one persistent tmux session with tabs for Cline,
+OpenCode, and the project README, then serves it on a loopback port. It
+generates a password and prints the password and the page URL when it starts:
 
 ```bash
 docker run --rm \
@@ -57,9 +62,24 @@ docker run --rm \
   ghcr.io/mdp/driftty-demo:edge
 ```
 
-Open <http://localhost:7117>. Cline and OpenCode may ask for provider or
-account configuration on first use. If either agent exits, its tab continues
-as a Bash shell. Reconnecting attaches to the same `driftty-demo` session.
+You'll see:
+
+```text
+driftty demo is running
+URL: http://localhost:7117
+Password: <generated>
+```
+
+Open <http://localhost:7117> and sign in with the password (username
+`driftty`). If you run detached, the same lines appear in `docker logs`. Choose
+a stable password so you don't have to copy it from logs every time:
+
+```bash
+docker run --rm \
+  -p 127.0.0.1:7117:7117 \
+  -e DRIFTTY_DEMO_PASSWORD="$(openssl rand -base64 24)" \
+  ghcr.io/mdp/driftty-demo:edge
+```
 
 To give OpenCode access to the current directory:
 
@@ -70,56 +90,30 @@ docker run --rm \
   ghcr.io/mdp/driftty-demo:edge
 ```
 
-The demo has no authentication. Keep it bound to `127.0.0.1`.
+Cline and OpenCode may ask for provider or account configuration on first use.
+If either agent exits, its tab continues as a Bash shell. Reconnecting attaches
+to the same `driftty-demo` session. Set `DRIFTTY_DEMO_URL` to correct the
+printed link when you publish the demo on another interface, and put it behind
+HTTPS if that interface is not loopback.
 
-## Serve local tmux
+## Serve your machine's tmux
 
-This is the shortest path from a Linux host to driftty. It requires Docker,
-tmux, and the default tmux socket layout. Inspect the script, then run it:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mdp/driftty/main/scripts/serve-local.sh
-curl -fsSL https://raw.githubusercontent.com/mdp/driftty/main/scripts/serve-local.sh | sh
-```
-
-The script:
-
-- starts a detached `main` session if the host tmux server is not running;
-- pulls the current gateway image and checks tmux client compatibility;
-- replaces the `driftty-local` container; and
-- prints the URL and password.
-
-The default URL is <http://127.0.0.1:7681>. The password remains stable across
-updates in `~/.config/driftty/local-password`.
-
-To bind only to this machine's Tailscale IPv4:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mdp/driftty/main/scripts/serve-local.sh |
-  DRIFTTY_BIND="$(tailscale ip -4)" sh
-```
-
-You can also set `DRIFTTY_PORT`, `DRIFTTY_IMAGE`, `DRIFTTY_CONTAINER`,
-`DRIFTTY_TMUX_SESSION`, `DRIFTTY_TMUX_SOCKET_DIR`,
-`DRIFTTY_TMUX_SOCKET_NAME`, or `DRIFTTY_STATE_DIR`. Rerun the script to pull
-the selected image and recreate the gateway.
-
-### Run local tmux manually
+The shortest path from a Linux host to your own tmux server. It requires Docker
+and tmux, and runs the gateway's tmux client against your host's tmux socket:
 
 ```bash
 tmux has-session 2>/dev/null || tmux new-session -d -s main
-docker build --target gateway -t driftty-gateway:local .
-
 docker run --rm --name driftty-local \
   -p 127.0.0.1:7681:7681 \
   -v "/tmp/tmux-$(id -u):/run/host-tmux:ro" \
-  driftty-gateway:local \
+  ghcr.io/mdp/driftty-gateway:edge \
   --local-tmux /run/host-tmux/default
 ```
 
-The foreground log prints a generated password. Open
-<http://localhost:7681>, sign in, and choose any host tmux session. The **+**
-button creates a real host session named `driftty-<name>`.
+The foreground log prints a generated password. Open <http://localhost:7681>,
+sign in, and choose any host tmux session. The **+** button creates a real host
+session named `driftty-<name>`. Reconnecting or refreshing reattaches to your
+existing shells.
 
 Only the tmux client runs in Docker. Commands, shells, and newly created
 sessions run through the host tmux server as the user who owns that server.
@@ -136,12 +130,56 @@ directory and pass its container path to `--local-tmux`.
 > interfaces and carries plaintext HTTP until a TLS tunnel or reverse proxy is
 > added.
 
-## Run the SSH gateway
+## SSH to another machine
 
-The gateway can connect to multiple SSH hosts and expose direct login shells,
-pinned tmux sessions, user-created tmux sessions, or any combination of those.
-Each target needs an SSH server, public-key authentication, and tmux if its
-profile uses session routing.
+The gateway connects to any machine that accepts your SSH key. This is the
+fastest path: one direct-login profile, one generated SSH key, and a gateway
+container on your loopback port.
+
+```bash
+mkdir -p driftty-ssh/keys && cd driftty-ssh
+
+cat > profiles.yaml <<'EOF'
+profiles:
+  - slug: server
+    label: My server
+    host: myserver.example.com  # change me
+    port: 22
+    user: mark                  # change me
+    key: server
+EOF
+
+docker run --rm \
+  --entrypoint /usr/local/bin/driftty-keygen \
+  -v "$PWD/keys:/keys" \
+  ghcr.io/mdp/driftty-gateway:edge \
+  server
+
+ssh-copy-id -i keys/server.pub -p 22 mark@myserver.example.com
+
+docker run --rm -it \
+  -p 127.0.0.1:7681:7681 \
+  -v "$PWD/profiles.yaml:/config/profiles.yaml:ro" \
+  -v "$PWD/keys:/keys:ro" \
+  -v driftty-known-hosts:/known-hosts \
+  ghcr.io/mdp/driftty-gateway:edge
+```
+
+`driftty-keygen` generates an SSH key pair on your machine, `ssh-copy-id`
+installs the public half on the remote, and the gateway prints a generated
+password when it starts. Open <http://localhost:7681>, sign in, and pick
+**My server**. Without `sessions`, each terminal is a fresh SSH login; add
+pinned `sessions` or `new_sessions` to the profile for persistent remote tmux
+shells with stable URLs. See
+[Configure SSH profiles](#configure-ssh-profiles) for the full profile
+reference.
+
+## Deploy the gateway in production
+
+A production gateway connects to multiple SSH hosts and exposes direct login
+shells, pinned tmux sessions, user-created tmux sessions, or any combination of
+those. Each target needs an SSH server, public-key authentication, and tmux if
+its profile uses session routing.
 
 > driftty is alpha software. One master password protects every configured
 > terminal, and there is no rate limiting or multi-user authorization. For a
