@@ -134,7 +134,6 @@ export class Terminal extends Component<Props, State> {
     this.xterm.onTouchSelection((touchSelection) =>
       this.setState({touchSelection})
     );
-    await this.xterm.refreshToken();
     this.xterm.open(this.container);
     this.fixedMobileViewport.start();
     this.xterm.connect();
@@ -303,10 +302,11 @@ export class Terminal extends Component<Props, State> {
             )}
           </div>
         )}
-        {reconnectRequired && this.mobileClient && (
+        {reconnectRequired && (
           <button
+            type="button"
             class="reconnect-button"
-            onClick={() => this.xterm.reconnectNow()}
+            onClick={this.reconnect}
           >
             Reconnect
           </button>
