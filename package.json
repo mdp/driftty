@@ -19,6 +19,9 @@
     "test:all": "npm test && npm run test:gateway",
     "release:bundle": "bun scripts/package-release.ts",
     "env:check": "varlock load --agent",
+    "env:encrypt": "varlock encrypt --file .env",
+    "env:encrypt:cloudflare": "varlock encrypt --file examples/cloudflare-ssh/.env",
+    "env:encrypt:development": "varlock encrypt --file examples/docker-development/.env",
     "compose": "varlock run --inject vars -- docker compose",
     "compose:cloudflare": "varlock run --path examples/cloudflare-ssh/ --inject vars -- docker compose --project-directory examples/cloudflare-ssh",
     "compose:development": "varlock run --path examples/docker-development/ --inject vars -- docker compose --project-directory examples/docker-development"

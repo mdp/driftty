@@ -394,10 +394,21 @@ From the checkout:
 
 ```sh
 npm ci
+npm run env:encrypt
 npm run env:check
 npm run compose -- config --quiet
 npm run compose -- up -d --wait
 ```
+
+`env:encrypt` presents an interactive checklist of sensitive values found in
+`.env`, then replaces the selected plaintext values with device-local
+`varlock("local:...")` references. It is safe to run again after adding or
+changing a secret. Varlock decrypts those references when the `compose` wrapper
+runs. If Linux cannot use a keyring or TPM, Varlock reports that it is using its
+file-based local key; this still keeps the values out of plaintext files. The
+local key is required recovery material. Device-bound encrypted values are not
+portable, so reveal them interactively and re-encrypt them on a destination
+machine when migrating.
 
 The root schema requires the Cloudflare token. Its gateway password is optional,
 matching the generated-password behavior. Both deployment examples require a
@@ -405,7 +416,9 @@ password; the development schema also validates ports and user/group IDs.
 Use the example's own environment files with:
 
 ```sh
+npm run env:encrypt:cloudflare
 npm run compose:cloudflare -- up -d --wait
+npm run env:encrypt:development
 npm run compose:development -- run --build --rm keygen development
 npm run compose:development -- up --build -d --wait
 ```
@@ -414,15 +427,18 @@ For a copied example or release bundle, install the standalone Varlock CLI or
 use the pinned npm command from that deployment directory:
 
 ```sh
+npx --yes varlock@1.18.0 encrypt --file .env
 npx --yes varlock@1.18.0 load --agent
 npx --yes varlock@1.18.0 run --inject vars -- docker compose up -d --wait
 ```
 
 `load --agent` gives redacted diagnostics. Raw JSON, env/shell exports, and
 `printenv` can reveal secrets. Wrapping Compose validates and injects settings;
-it does not encrypt `.env` files, hide the container environment from Docker
-administrators, or protect output from later unwrapped commands. SSH private
-keys remain files in `keys/`. The one-command terminal trial needs no Varlock.
+local encryption protects the values stored in `.env`, while the Compose
+wrapper decrypts them only for the launched process. It does not hide the
+container environment from Docker administrators or protect output from later
+unwrapped commands. SSH private keys remain files in `keys/`. The one-command
+terminal trial needs no Varlock.
 
 ## Security and connection behavior
 

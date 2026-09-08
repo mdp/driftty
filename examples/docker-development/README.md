@@ -39,13 +39,18 @@ loopback port, then removes its containers and volumes.
 
 ## Validate with Varlock
 
-This directory includes `.env.schema`. After configuring `.env`, you can validate
-settings and run Compose with secret redaction (requires Node 22.3+):
+This directory includes `.env.schema`. After configuring `.env`, encrypt its
+sensitive values in place, validate them, and run Compose through Varlock
+(requires Node 22.3+):
 
 ```sh
+npx --yes varlock@1.18.0 encrypt --file .env
 npx --yes varlock@1.18.0 load --agent
 npx --yes varlock@1.18.0 run --inject vars -- docker compose config --quiet
 ```
 
-Use the same `run --inject vars --` prefix for other Compose commands. Keep
-credentials out of the schema; `.env.local` also works with this wrapper.
+The encryption command lets you confirm which sensitive values to replace with
+device-local `varlock("local:...")` references. Run it again after changing a
+secret. Use the same `run --inject vars --` prefix for other Compose commands;
+plain `docker compose` cannot resolve encrypted references. Keep credentials
+out of the schema; `.env.local` also works with this wrapper.

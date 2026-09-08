@@ -43,9 +43,17 @@ curl -fsS -b "$test_root/cookie" -X POST -d 'name=smoke' \
 bun scripts/terminal-smoke.ts "$base/development/smoke/"
 compose exec -T development su node -c 'tmux set-environment -t driftty-smoke DRIFTTY_SMOKE persisted'
 compose restart gateway
-compose up -d --wait
 port=$(compose port gateway 7681 | sed 's/.*://')
 base=http://127.0.0.1:$port
+attempt=0
+until curl -fsS "$base/_health" >/dev/null 2>&1; do
+  attempt=$((attempt + 1))
+  if [ "$attempt" -ge 30 ]; then
+    compose logs gateway
+    exit 1
+  fi
+  sleep 1
+done
 bun scripts/terminal-smoke.ts "$base/development/smoke/"
 compose exec -T development su node -c \
   'test "$(tmux show-environment -t driftty-smoke DRIFTTY_SMOKE)" = "DRIFTTY_SMOKE=persisted"'
