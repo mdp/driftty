@@ -28,9 +28,10 @@ jobs:
           CLOUDFLARE_TUNNEL_TOKEN: validation
           DRIFTTY_PASSWORD: validation
         run: |
-          docker compose config --quiet
-          docker compose -f examples/cloudflare-ssh/compose.yaml config --quiet
-          docker compose -f examples/docker-development/compose.yaml config --quiet
+          npm run env:check
+          npm run compose -- config --quiet
+          npm run compose:cloudflare -- config --quiet
+          npm run compose:development -- config --quiet
       - name: Build images
         run: |
           docker build --target generic -t driftty:test .
@@ -43,6 +44,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y tmux
           scripts/local-tmux-gateway.integration.test.sh
+      - name: Test Docker SSH example and session persistence
+        run: sh scripts/docker-development.integration.test.sh
       - name: Smoke test arbitrary command
         run: |
           id=$(docker run -d -p 17681:7681 driftty:test sh)
@@ -52,6 +55,7 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:17681/ | grep -q 'terminal-container'
+          bun scripts/terminal-smoke.ts http://127.0.0.1:17681/
       - name: Smoke test coding CLI demo
         run: |
           id=$(docker run -d -p 17117:7117 \
@@ -63,6 +67,9 @@ jobs:
             sleep 1
           done
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:17117/)" = 401
+          docker exec "$id" tmux select-window -t driftty-demo:Readme
+          DRIFTTY_SMOKE_USER=driftty DRIFTTY_SMOKE_PASSWORD=smoke-secret \
+            bun scripts/terminal-smoke.ts http://127.0.0.1:17117/
           node --input-type=module <<'NODE'
           import {createConnection} from 'node:net';
           import {randomBytes} from 'node:crypto';
