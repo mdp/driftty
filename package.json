@@ -17,7 +17,11 @@
     "test": "vitest run",
     "test:gateway": "cd gateway && bun test",
     "test:all": "npm test && npm run test:gateway",
-    "release:bundle": "bun scripts/package-release.ts"
+    "release:bundle": "bun scripts/package-release.ts",
+    "env:check": "varlock load --agent",
+    "compose": "varlock run --inject vars -- docker compose",
+    "compose:cloudflare": "varlock run --path examples/cloudflare-ssh/ --inject vars -- docker compose --project-directory examples/cloudflare-ssh",
+    "compose:development": "varlock run --path examples/docker-development/ --inject vars -- docker compose --project-directory examples/docker-development"
   },
   "engines": {
     "node": ">=22.12"
@@ -26,6 +30,7 @@
     "@preact/preset-vite": "^2.10.6",
     "sass": "^1.102.0",
     "typescript": "^7.0.2",
+    "varlock": "1.18.0",
     "vite": "^8.1.5",
     "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^4.1.10"

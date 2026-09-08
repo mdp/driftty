@@ -1,0 +1,14 @@
+When working with environment configuration, read `.env.schema` and the example
+schemas for variable names, defaults, and validation rules. Do not read or print
+secret-bearing `.env` files, SSH private keys, or deployment backups. Do not print
+`config/profiles.yaml`, which may contain legacy credentials.
+
+Use `npm run env:check` for redacted validation. For another deployment directory,
+use `npm run env:check -- --path /path/to/deployment/`. Use the `compose`,
+`compose:cloudflare`, and `compose:development` npm scripts to validate and inject
+configuration before Compose runs. Avoid raw `varlock load --format json`,
+`--format env`, `--format shell`, `printenv`, and unwrapped `docker compose config`
+output, which can expose secrets. `config --quiet` validates without printing them.
+
+Keep credentials in ignored local files or an explicitly configured secret
+provider. Commit schema changes when adding or changing environment variables.

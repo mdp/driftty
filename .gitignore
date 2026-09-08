@@ -80,3 +80,12 @@ config/profiles.yaml
 
 # Private incident artifacts (never commit paste/trigger content)
 paste.txt
+
+# Example SSH credentials
+examples/*/keys/*
+!examples/*/keys/.gitkeep
+
+# Varlock generated local state
+.varlock/
+.env.local.key
+.env-flat/
