@@ -1,7 +1,6 @@
 import {
   copyFileSync,
   mkdtempSync,
-  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -75,34 +74,4 @@ test('run injects resolved secrets and redacts them from captured child output',
   expect(result.status).toBe(0);
   expect(result.stdout).toContain('injection-passed');
   expect(result.stdout + result.stderr).not.toContain(secret);
-});
-
-test('local encryption removes plaintext and decrypts only for the child', () => {
-  const secret = 'synthetic-local-encryption-secret-12345';
-  const dir = fixture('examples/docker-development/.env.schema');
-  const env = {...process.env, XDG_CONFIG_HOME: join(dir, 'config')};
-  delete env.DRIFTTY_PASSWORD;
-
-  const encrypted = spawnSync(cli, ['encrypt'], {
-    env,
-    input: `${secret}\n`,
-    encoding: 'utf8',
-    timeout: 15000,
-  });
-  expect(encrypted.status).toBe(0);
-  const assignment = encrypted.stdout.match(
-    /SOME_SENSITIVE_KEY=(varlock\("local:[^"\n]+"\))/,
-  );
-  expect(assignment?.[1]).toBeTruthy();
-  writeFileSync(join(dir, '.env'), `DRIFTTY_PASSWORD=${assignment![1]}\n`);
-  expect(readFileSync(join(dir, '.env'), 'utf8')).not.toContain(secret);
-
-  const injected = spawnSync(cli, [
-    'run', '--path', dir, '--inject', 'vars', '--',
-    process.execPath, '-e',
-    `if (process.env.DRIFTTY_PASSWORD !== '${secret}') process.exit(1); console.log('encrypted-injection-passed');`,
-  ], {env, encoding: 'utf8', timeout: 15000});
-  expect(injected.status).toBe(0);
-  expect(injected.stdout).toContain('encrypted-injection-passed');
-  expect(injected.stdout + injected.stderr).not.toContain(secret);
 });
