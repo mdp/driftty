@@ -3,15 +3,17 @@
 # driftty-on-instacloud demo setup.
 #
 # Creates an InstaCloud project (default: driftty-demo) under the CURRENT
-# account's own org, adds an always-on compute service, stores a stable demo
+# account's own org, adds an always-on compute service, stores a stable master
 # password (and optional provider API keys) as service secrets, deploys the
-# driftty demo image, waits for it to serve, and prints the URL and password.
+# driftty gateway demo image, waits for the single-password login page to
+# serve, and prints the URL and password.
 #
 # Idempotent: safe to re-run. Optional overrides come from ./.env:
-#   DRIFTTY_TAG=edge            # image tag from ghcr.io/mdp/driftty-demo
-#   DRIFTTY_DEMO_PASSWORD=...   # stable password; generated if empty
+#   DRIFTTY_TAG=insta           # image tag from ghcr.io/mdp/driftty-gateway-demo
+#   DRIFTTY_PASSWORD=...        # stable master password; generated if empty
 #   OPENAI_API_KEY=...          # optional, injected as OPENAI_API_KEY
 #   ANTHROPIC_API_KEY=...       # optional, injected as ANTHROPIC_API_KEY
+#   DRIFTTY_INSTA_SOURCE=1      # deploy this dir's Dockerfile instead of the image
 #
 # If a command returns an InstaCloud approval prompt, the CLI output is printed
 # verbatim (run `insta approvals approve <id>`) and the script stops.
@@ -22,7 +24,8 @@ cd "$(dirname "$0")"
 
 project=${DRIFTTY_INSTA_PROJECT:-driftty-demo}
 service_name=driftty
-port=7117
+port=7681
+source_deploy=${DRIFTTY_INSTA_SOURCE:-0}
 
 # Load optional overrides from ./.env if present.
 if [ -f ./.env ]; then
@@ -33,7 +36,7 @@ if [ -f ./.env ]; then
 fi
 
 # Image tag from ./.env (DRIFTTY_TAG) — assigned AFTER .env is loaded.
-image="ghcr.io/mdp/driftty-demo:${DRIFTTY_TAG:-edge}"
+image="ghcr.io/mdp/driftty-demo:${DRIFTTY_TAG:-gwdemo}"
 
 if ! command -v insta >/dev/null 2>&1; then
   echo "insta CLI not found. Install it, then re-run:" >&2
@@ -101,13 +104,13 @@ else
 fi
 
 # --- secrets ----------------------------------------------------------------
-password=${DRIFTTY_DEMO_PASSWORD:-}
+password=${DRIFTTY_PASSWORD:-}
 if [ -z "$password" ]; then
   password="$(openssl rand -base64 24 | tr '+/' '-_' | tr -d '=\n')"
 fi
 
-echo "==> Setting DRIFTTY_DEMO_PASSWORD secret"
-gated insta secrets set DRIFTTY_DEMO_PASSWORD "$password" --service "compute/${service_name}"
+echo "==> Setting DRIFTTY_PASSWORD secret"
+gated insta secrets set DRIFTTY_PASSWORD "$password" --service "compute/${service_name}"
 
 if [ -n "${OPENAI_API_KEY:-}" ]; then
   echo "==> Setting OPENAI_API_KEY secret"
@@ -119,8 +122,13 @@ if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
 fi
 
 # --- deploy ----------------------------------------------------------------
-echo "==> Deploying ${image} (port ${port}, websocket)"
-gated insta deploy --image "$image" --group "$service_name" --port "$port" --websocket --json
+if [ "$source_deploy" = 1 ]; then
+  echo "==> Deploying source in ${PWD} (port ${port}, websocket)"
+  gated insta deploy . --group "$service_name" --port "$port" --websocket --json
+else
+  echo "==> Deploying ${image} (port ${port}, websocket)"
+  gated insta deploy --image "$image" --group "$service_name" --port "$port" --websocket --json
+fi
 
 # --- verify ----------------------------------------------------------------
 domain="$(insta services list --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(s["domain"] for s in d if s["type"]=="compute" and s["name"]==sys.argv[1]))' "$service_name")"
@@ -129,32 +137,38 @@ url="https://${domain}"
 if ! command -v curl >/dev/null 2>&1; then
   echo "==> Deployed. Install curl to wait for readiness."
   echo
-  echo "driftty demo is running on InstaCloud"
-  echo "URL: ${url}  (username: driftty)"
+  echo "driftty is running on InstaCloud"
+  echo "URL: ${url}"
   echo "Password: ${password}"
   exit 0
 fi
 
 echo "==> Waiting for ${url} to serve"
 ok=
-for _ in $(seq 1 30); do
+for _ in $(seq 1 40); do
   code="$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)"
-  if [ "$code" = 200 ] || [ "$code" = 401 ]; then
-    ok=1
-    break
-  fi
+  case "$code" in
+    200|302|401) ok=1; break ;;
+  esac
   sleep 3
 done
 
 if [ -z "$ok" ]; then
-  echo "Deploy did not answer within ~90s. Check:" >&2
+  echo "Deploy did not answer within ~2m. Check:" >&2
   echo "  insta logs compute --group ${service_name}" >&2
   exit 1
 fi
 
+echo "==> Verifying the driftty login page"
+if curl -sL "$url/login" | grep -q 'Master password'; then
+  echo "    single-password page OK"
+else
+  echo "    warning: could not find the driftty login page" >&2
+fi
+
 echo
-echo "driftty demo is running on InstaCloud"
-echo "URL: ${url}  (username: driftty)"
+echo "driftty is running on InstaCloud"
+echo "URL: ${url}"
 echo "Password: ${password}"
 echo
 echo "Open the URL, sign in, and pick an agent from the menu."

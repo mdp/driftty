@@ -12,17 +12,20 @@ fi
 
 session=driftty-demo
 
+# Agent windows start at a plain shell with a hint; the launcher menu sends the
+# agent command when you pick one. This keeps the agents from auto-updating
+# themselves (and swapping their own binaries) at container boot.
 if ! tmux has-session -t "$session" 2>/dev/null; then
   tmux new-session -d -s "$session" -n Menu \
     'bash /usr/local/bin/driftty-agent-menu'
   tmux new-window -t "$session" -n OpenCode \
-    'opencode; exec /bin/bash --login'
+    'printf "= OpenCode =  start it from the menu, or type: opencode\n  configure with: opencode auth login\n"; exec /bin/bash --login'
   tmux new-window -t "$session" -n Codex \
-    'codex; exec /bin/bash --login'
+    'printf "= Codex =  start it from the menu, or type: codex\n  configure with: codex login\n"; exec /bin/bash --login'
   tmux new-window -t "$session" -n Claude \
-    'claude; exec /bin/bash --login'
+    'printf "= Claude =  start it from the menu, or type: claude\n"; exec /bin/bash --login'
   tmux new-window -t "$session" -n Cline \
-    'cline; exec /bin/bash --login'
+    'printf "= Cline =  start it from the menu, or type: cline\n"; exec /bin/bash --login'
   tmux new-window -t "$session" -n Shell \
     'exec /bin/bash --login'
   tmux new-window -t "$session" -n Readme \

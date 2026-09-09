@@ -90,7 +90,9 @@ Password: <generated>
 
 Open <http://localhost:7117> and sign in with the password (username
 `driftty`). You land on the launcher menu: pick an agent to jump into its
-window and configure it, or use the tabs directly. If you run detached, the
+window and start it, then configure it there. The agent tabs start as plain
+shells, so nothing auto-starts — the agents run and self-update only when you
+launch them. If you run detached, the
 same lines appear in `docker logs`. Choose a password and save it if you want
 to reuse it across runs:
 
@@ -126,7 +128,7 @@ docker run --rm \
 
 `DRIFTTY_OPENAI_API_KEY` becomes `OPENAI_API_KEY` (used by OpenCode and Codex);
 `DRIFTTY_ANTHROPIC_API_KEY` becomes `ANTHROPIC_API_KEY` (used by Claude and
-Cline). If an agent exits, its tab continues as a Bash shell. Reconnecting
+Cline). When an agent exits, its tab continues as a Bash shell. Reconnecting
 attaches to the same `driftty-demo` session. Set `DRIFTTY_DEMO_URL` to correct
 the printed link when you publish the demo on another interface, and put it
 behind HTTPS if that interface is not loopback.

@@ -1,7 +1,9 @@
 #!/bin/bash
-# Interactive launcher for the driftty demo tmux session. Runs in the Menu
-# window: pick a coding agent, land in its window, and start it. The agent
+# Interactive launcher for the driftty gateway demo tmux session. Runs in the
+# Menu window: pick a coding agent, land in its window, and start it. The agent
 # windows begin at a plain shell so nothing auto-updates at boot.
+# Uses the tmux matching the session's server (shimmed onto PATH by the
+# gateway-demo entrypoint).
 set -u
 
 session=$(tmux display-message -p '#{session_name}' 2>/dev/null || echo driftty-demo)
@@ -20,7 +22,7 @@ pick() {
 
 while true; do
   clear
-  printf "driftty demo — pick a coding agent to start\n\n"
+  printf "driftty gateway demo — pick a coding agent to start\n\n"
   printf "  1) OpenCode   (opencode auth login)\n"
   printf "  2) Codex      (codex login)\n"
   printf "  3) Claude     (first run walks through setup)\n"
