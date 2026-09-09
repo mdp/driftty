@@ -80,3 +80,19 @@ config/profiles.yaml
 
 # Private incident artifacts (never commit paste/trigger content)
 paste.txt
+
+# Example SSH credentials
+examples/*/keys/*
+!examples/*/keys/.gitkeep
+
+# InstaCloud demo example state
+examples/insta/.env
+examples/insta/.insta/
+
+# Varlock generated local state
+.varlock/
+.env.local.key
+.env-flat/
+
+# Local agent credentials
+.insta/agent-session.json

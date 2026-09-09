@@ -32,11 +32,27 @@ routing to persistent tmux sessions.
   />
 </p>
 
+## Try it in a minute
+
+With Docker running, paste this command:
+
+```bash
+docker run --rm --pull always -p 127.0.0.1:7681:7681 ghcr.io/mdp/driftty:edge sh
+```
+
+Open <http://localhost:7681> and start typing. No checkout, keys, account, or
+configuration needed. This is a disposable container shell; Ctrl+C in the
+launching terminal stops it. The first image download depends on your connection.
+
+To reach your own shells or try the coding tools, choose a setup below.
+`edge` tracks the latest successful build of `main`; `latest` tracks the last
+versioned release. Add `--pull always` to `docker run` to check for updates.
+
 ## Choose a setup
 
 | Goal | Start here |
 | --- | --- |
-| Try Cline and OpenCode in a browser | [Run the Docker demo](#run-the-docker-demo) |
+| Try OpenCode, Codex, Claude, and Cline in a browser | [Run the Docker demo](#run-the-docker-demo) |
 | Reach this machine's tmux from a browser | [Serve your machine's tmux](#serve-your-machines-tmux) |
 | Reach another machine over SSH | [SSH to another machine](#ssh-to-another-machine) |
 
@@ -45,6 +61,7 @@ routing to persistent tmux sessions.
 | Develop driftty's web client | [Develop the web client](#develop-the-web-client) |
 | Run one small terminal command | [Run one command](#run-one-command) |
 | Deploy a shared gateway with a public URL | [Deploy the gateway in production](#deploy-the-gateway-in-production) |
+| Demo the multi-agent container on InstaCloud | [examples/insta](examples/insta) |
 
 All three images embed the same mobile client. The demo and single-command
 images wrap one `ttyd` process, while the gateway adds a login page, host
@@ -52,9 +69,10 @@ picker, stable URLs, SSH routing, and local tmux discovery.
 
 ## Run the Docker demo
 
-The demo image starts one persistent tmux session with tabs for Cline,
-OpenCode, and the project README, then serves it on a loopback port. It
-generates a password and prints the password and the page URL when it starts:
+The demo image starts one persistent tmux session with a launcher menu and
+tabs for the OpenCode, Codex, Claude, and Cline coding agents (plus a shell and
+the project README), then serves it on a loopback port. It generates a password
+and prints the password and the page URL when it starts:
 
 ```bash
 docker run --rm \
@@ -71,17 +89,19 @@ Password: <generated>
 ```
 
 Open <http://localhost:7117> and sign in with the password (username
-`driftty`). If you run detached, the same lines appear in `docker logs`. Choose
-a stable password so you don't have to copy it from logs every time:
+`driftty`). You land on the launcher menu: pick an agent to jump into its
+window and configure it, or use the tabs directly. If you run detached, the
+same lines appear in `docker logs`. Choose a password and save it if you want
+to reuse it across runs:
 
 ```bash
 docker run --rm \
   -p 127.0.0.1:7117:7117 \
-  -e DRIFTTY_DEMO_PASSWORD="$(openssl rand -base64 24)" \
+  -e DRIFTTY_DEMO_PASSWORD="your-saved-password" \
   ghcr.io/mdp/driftty-demo:edge
 ```
 
-To give OpenCode access to the current directory:
+To give the agents access to the current directory:
 
 ```bash
 docker run --rm \
@@ -90,11 +110,26 @@ docker run --rm \
   ghcr.io/mdp/driftty-demo:edge
 ```
 
-Cline and OpenCode may ask for provider or account configuration on first use.
-If either agent exits, its tab continues as a Bash shell. Reconnecting attaches
-to the same `driftty-demo` session. Set `DRIFTTY_DEMO_URL` to correct the
-printed link when you publish the demo on another interface, and put it behind
-HTTPS if that interface is not loopback.
+Each agent may ask for provider or account configuration on first use —
+`opencode auth login`, `codex login`, `claude`, or Cline's setup screen. To
+skip interactive login for the providers you already have keys for, pass the
+keys as environment variables and the container exports them into every tab:
+
+```bash
+docker run --rm \
+  -p 127.0.0.1:7117:7117 \
+  -e DRIFTTY_DEMO_PASSWORD="your-saved-password" \
+  -e DRIFTTY_OPENAI_API_KEY="sk-..." \
+  -e DRIFTTY_ANTHROPIC_API_KEY="sk-ant-..." \
+  ghcr.io/mdp/driftty-demo:edge
+```
+
+`DRIFTTY_OPENAI_API_KEY` becomes `OPENAI_API_KEY` (used by OpenCode and Codex);
+`DRIFTTY_ANTHROPIC_API_KEY` becomes `ANTHROPIC_API_KEY` (used by Claude and
+Cline). If an agent exits, its tab continues as a Bash shell. Reconnecting
+attaches to the same `driftty-demo` session. Set `DRIFTTY_DEMO_URL` to correct
+the printed link when you publish the demo on another interface, and put it
+behind HTTPS if that interface is not loopback.
 
 ## Serve your machine's tmux
 
@@ -118,8 +153,8 @@ existing shells.
 Only the tmux client runs in Docker. Commands, shells, and newly created
 sessions run through the host tmux server as the user who owns that server.
 At least one session must stay alive for the default server socket to remain.
-For detached use, add `-d --restart unless-stopped`; retrieve a generated
-password with `docker logs driftty-local`.
+For detached use, replace `--rm` with `-d --restart unless-stopped`; retrieve
+a generated password with `docker logs driftty-local`.
 
 This socket-mount approach is for Linux. macOS Docker Desktop cannot expose a
 host tmux socket this way. A non-default socket works when you mount its parent
@@ -205,16 +240,17 @@ Then:
    home directories. Adjust the pinned and new-session settings as needed.
 2. Generate a master password with `openssl rand -base64 32` and put it in
    `DRIFTTY_PASSWORD` in `.env`.
-3. Generate and install the SSH key:
+3. Create a remotely managed Cloudflare Tunnel and published application. Set
+   its service URL to `http://gateway:7681`, then put its connector token in
+   `CLOUDFLARE_TUNNEL_TOKEN` in `.env`. Compose requires this value even when
+   running the key generator.
+4. Generate and install the SSH key:
 
    ```bash
    docker compose run --rm keygen example
    ssh-copy-id -i keys/example.pub -p 22 your-user@example.com
    ```
 
-4. Create a remotely managed Cloudflare Tunnel and published application. Set
-   its service URL to `http://gateway:7681`, then put its connector token in
-   `CLOUDFLARE_TUNNEL_TOKEN` in `.env`.
 5. Validate and start everything:
 
    ```bash
@@ -241,6 +277,7 @@ GitHub releases include a version-matched gateway bundle. After unpacking it:
 ```bash
 cp .env.example .env
 cp profiles.example.yaml config/profiles.yaml
+# Set CLOUDFLARE_TUNNEL_TOKEN and DRIFTTY_PASSWORD in .env first.
 docker compose run --rm keygen baz
 ```
 
@@ -316,8 +353,8 @@ cd examples/docker-development
 cp .env.example .env
 # Replace DRIFTTY_PASSWORD in .env; `openssl rand -base64 32` is suitable.
 
-docker compose run --rm keygen development
-docker compose up --build -d
+docker compose run --build --rm keygen development
+docker compose up --build -d --wait
 docker compose logs gateway
 ```
 
@@ -363,6 +400,48 @@ docker run --rm -p 127.0.0.1:8080:8080 \
 This image enables writable terminal input and embeds the client at
 `/usr/share/ttyd/index.html`. It does not add authentication, so keep it on a
 trusted interface.
+
+## Validate configuration with Varlock
+
+[Varlock](https://varlock.dev/reference/cli/load-and-run/) validates environment
+settings before Compose runs and redacts known secrets in piped command output.
+The committed `.env.schema` files document settings; keep real values in ignored
+`.env` or `.env.local` files. Existing `.env.example` files remain available for
+plain Docker Compose users.
+
+From the checkout:
+
+```sh
+npm ci
+npm run env:check
+npm run compose -- config --quiet
+npm run compose -- up -d --wait
+```
+
+The root schema requires the Cloudflare token. Its gateway password is optional,
+matching the generated-password behavior. Both deployment examples require a
+password; the development schema also validates ports and user/group IDs.
+Use the example's own environment files with:
+
+```sh
+npm run compose:cloudflare -- up -d --wait
+npm run compose:development -- run --build --rm keygen development
+npm run compose:development -- up --build -d --wait
+```
+
+For a copied example or release bundle, install the standalone Varlock CLI or
+use the pinned npm command from that deployment directory:
+
+```sh
+npx --yes varlock@1.18.0 load --agent
+npx --yes varlock@1.18.0 run --inject vars -- docker compose up -d --wait
+```
+
+`load --agent` gives redacted diagnostics. Raw JSON, env/shell exports, and
+`printenv` can reveal secrets. Wrapping Compose validates and injects settings;
+it does not encrypt `.env` files, hide the container environment from Docker
+administrators, or protect output from later unwrapped commands. SSH private
+keys remain files in `keys/`. The one-command terminal trial needs no Varlock.
 
 ## Security and connection behavior
 
@@ -427,12 +506,14 @@ Requirements: Node 24+, Bun, and Docker.
 
 ```bash
 npm ci
+bun install --cwd gateway --frozen-lockfile
 npm run test:all
 npm run build
 docker build --target generic -t driftty .
 docker build --target demo -t driftty-demo .
 docker build --target gateway -t driftty-gateway .
 CLOUDFLARE_TUNNEL_TOKEN=validation docker compose config --quiet
+sh scripts/docker-development.integration.test.sh
 ```
 
 Create a versioned gateway bundle with:
@@ -441,7 +522,8 @@ Create a versioned gateway bundle with:
 npm run release:bundle -- 3.0.0
 ```
 
-Images are published for Linux AMD64 and ARM64. The `main` branch publishes
+The generic and gateway images support Linux AMD64 and ARM64; the coding demo
+is published for AMD64 only. The `main` branch publishes
 `edge`; a `vX.Y.Z` tag publishes `X.Y.Z` and `latest`.
 
 ## What the client provides
@@ -459,7 +541,7 @@ Images are published for Linux AMD64 and ARM64. The `main` branch publishes
 | Image | Use it for | Persistence |
 | --- | --- | --- |
 | `ghcr.io/mdp/driftty` | One command or local shell | Lifetime of the command |
-| `ghcr.io/mdp/driftty-demo` | A ready-to-run coding-agent trial | Lifetime of the container |
+| `ghcr.io/mdp/driftty-demo` | A ready-to-run multi-agent trial with a launcher menu and OpenCode, Codex, Claude, and Cline tabs | Lifetime of the container |
 | `ghcr.io/mdp/driftty-gateway` | Local tmux, SSH hosts, and stable shell routes | Backed by host or remote tmux |
 
 ## Attribution

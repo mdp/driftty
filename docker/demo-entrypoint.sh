@@ -1,16 +1,33 @@
 #!/bin/sh
 set -eu
 
+# Optional agent API keys reach tmux windows through the session environment.
+# The menu hints at these when they are present.
+if [ -n "${DRIFTTY_OPENAI_API_KEY:-}" ]; then
+  export OPENAI_API_KEY="$DRIFTTY_OPENAI_API_KEY"
+fi
+if [ -n "${DRIFTTY_ANTHROPIC_API_KEY:-}" ]; then
+  export ANTHROPIC_API_KEY="$DRIFTTY_ANTHROPIC_API_KEY"
+fi
+
 session=driftty-demo
 
 if ! tmux has-session -t "$session" 2>/dev/null; then
-  tmux new-session -d -s "$session" -n Cline \
-    'cline; exec /bin/bash --login'
+  tmux new-session -d -s "$session" -n Menu \
+    'bash /usr/local/bin/driftty-agent-menu'
   tmux new-window -t "$session" -n OpenCode \
     'opencode; exec /bin/bash --login'
+  tmux new-window -t "$session" -n Codex \
+    'codex; exec /bin/bash --login'
+  tmux new-window -t "$session" -n Claude \
+    'claude; exec /bin/bash --login'
+  tmux new-window -t "$session" -n Cline \
+    'cline; exec /bin/bash --login'
+  tmux new-window -t "$session" -n Shell \
+    'exec /bin/bash --login'
   tmux new-window -t "$session" -n Readme \
     'cat /workspace/README.md; printf "\\nReadme output complete.\\n"; exec /bin/bash --login'
-  tmux select-window -t "$session:Cline"
+  tmux select-window -t "$session:Menu"
 fi
 
 user=${DRIFTTY_DEMO_USER:-driftty}
