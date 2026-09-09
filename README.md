@@ -32,6 +32,74 @@ routing to persistent tmux sessions.
   />
 </p>
 
+## Try the demo in the cloud (InstaCloud)
+
+One command puts the full multi-agent demo on a hosted VM with a password page:
+
+- A public HTTPS URL for your own microVM that opens on the driftty
+  **single-password login page**
+- Sign in, land on the terminal picker → **Local tmux → driftty-demo**
+- A tmux session with **OpenCode, Codex, Claude, and Cline** available plus a
+  launcher menu — pick one, configure it, and start coding in the browser
+
+```text
+browser -> https://<project>.compute.instacloud.com
+                -> /login (one master password) -> picker
+                -> tmux session (Menu + OpenCode/Codex/Claude/Cline/Shell/Readme)
+```
+
+You need the [insta CLI](https://docs.instacloud.com/introduction), logged in
+(`insta login`); nothing else — no Docker, keys, or Fly account. From this
+checkout:
+
+```sh
+cd examples/insta
+cp .env.example .env      # optional: set DRIFTTY_PASSWORD or provider keys
+./setup.sh
+```
+
+`setup.sh` is idempotent. It creates the project, adds an always-on compute
+service, stores the master password (generating one if empty) and any provider
+keys, deploys the image, waits for the login page to serve, and prints:
+
+```text
+driftty is running on InstaCloud
+URL: https://prod-main-driftty-<hash>.compute.instacloud-edge.com
+Password: <the password>
+```
+
+Open the URL and sign in with the master password — no username. Configure
+each agent on first use with `opencode auth login`, `codex login`, `claude`,
+or Cline's setup screen — or skip interactive login entirely by setting
+provider keys in `.env` (below). Reconnecting reattaches to the same tmux
+session; agent windows start as plain shells, so nothing runs until you pick
+one from the menu.
+
+Configuration lives in `examples/insta/.env`:
+
+| `.env` value | Effect |
+| --- | --- |
+| `DRIFTTY_PASSWORD` | Master password for the login page; empty = generated and printed |
+| `DRIFTTY_TAG` | Image tag to deploy (`gwdemo` = gateway demo, the default) |
+| `OPENAI_API_KEY` | Injected as `OPENAI_API_KEY` for OpenCode and Codex |
+| `ANTHROPIC_API_KEY` | Injected as `ANTHROPIC_API_KEY` for Claude and Cline |
+| `DRIFTTY_INSTA_PROJECT` | InstaCloud project name (default `driftty-demo`) |
+| `DRIFTTY_INSTA_SOURCE` | `1` to build the example's Dockerfile remotely instead of deploying the prebuilt image |
+
+Re-run `./setup.sh` to change the password or provider keys — secrets are
+injected on the next container start, and a changed password rotates existing
+browser sessions. Full walkthrough and caveats:
+[`examples/insta`](examples/insta). Notes:
+
+- Compute is rebuilt on redeploy, so agent logins (stored by the agents
+  themselves) do not survive one — the container is stateless by design.
+- One master password protects every terminal; treat the URL as a private
+  demo and rotate the password when you're done with it.
+- Gated actions (`services add`, `secrets set`, `deploy`) may require an
+  InstaCloud approval — `setup.sh` prints the `insta approvals approve <id>`
+  command to run, then re-run the script.
+- Remove everything when the demo is over: `insta project delete`.
+
 ## Try it in a minute
 
 With Docker running, paste this command:
@@ -132,73 +200,6 @@ Cline). When an agent exits, its tab continues as a Bash shell. Reconnecting
 attaches to the same `driftty-demo` session. Set `DRIFTTY_DEMO_URL` to correct
 the printed link when you publish the demo on another interface, and put it
 behind HTTPS if that interface is not loopback.
-
-## Deploy the demo on InstaCloud
-
-The same multi-agent demo, hosted. [`examples/insta`](examples/insta) provisions
-an InstaCloud project with an always-on compute service and deploys the driftty
-**gateway demo** image: a public HTTPS URL that opens on the driftty
-single-password login page, then drops you into a tmux session with **OpenCode,
-Codex, Claude, and Cline** available plus a launcher menu to configure and start
-one. Visit the URL from any device — phone-friendly, password-protected.
-
-```text
-browser -> https://<project>.compute.instacloud.com
-                -> /login (one master password) -> picker
-                -> tmux session (Menu + OpenCode/Codex/Claude/Cline/Shell/Readme)
-```
-
-You need the [insta CLI](https://docs.instacloud.com/introduction), logged in
-(`insta login`); nothing else — no Docker, keys, or Fly account:
-
-```sh
-cd examples/insta
-cp .env.example .env      # optional: set DRIFTTY_PASSWORD or provider keys
-./setup.sh
-```
-
-`setup.sh` is idempotent. It creates the project, adds a compute service,
-stores the master password (generating one if empty) and any provider keys,
-deploys the image, waits for the login page to serve, and prints:
-
-```text
-driftty is running on InstaCloud
-URL: https://prod-main-driftty-<hash>.compute.instacloud-edge.com
-Password: <the password>
-```
-
-Open the URL and sign in with the master password — no username. You land on
-the terminal picker: select **Local tmux → driftty-demo**, then the **Menu**
-window where you pick an agent to start. Configure it on first use with
-`opencode auth login`, `codex login`, `claude`, or Cline's setup screen — or skip
-interactive login entirely when you set provider keys in `.env` (see below).
-Reconnecting reattaches to the same tmux session; agent windows start as plain
-shells, so nothing runs until you pick one from the menu.
-
-Configuration lives in `examples/insta/.env`:
-
-| `.env` value | Effect |
-| --- | --- |
-| `DRIFTTY_PASSWORD` | Master password for the login page; empty = generated and printed |
-| `DRIFTTY_TAG` | Image tag to deploy (`gwdemo` = gateway demo, the default) |
-| `OPENAI_API_KEY` | Injected as `OPENAI_API_KEY` for OpenCode and Codex |
-| `ANTHROPIC_API_KEY` | Injected as `ANTHROPIC_API_KEY` for Claude and Cline |
-| `DRIFTTY_INSTA_PROJECT` | InstaCloud project name (default `driftty-demo`) |
-| `DRIFTTY_INSTA_SOURCE` | `1` to build the example's Dockerfile remotely instead of deploying the prebuilt image |
-
-Re-run `./setup.sh` to change the password or provider keys — secrets are
-injected on the next container start, and a changed password rotates existing
-browser sessions. Full walkthrough and caveats:
-[`examples/insta`](examples/insta). Notes:
-
-- Compute is rebuilt on redeploy, so agent logins (stored by the agents
-  themselves) do not survive one — the container is stateless by design.
-- One master password protects every terminal; treat the URL as a private
-  demo and rotate the password when you're done with it.
-- Gated actions (`services add`, `secrets set`, `deploy`) may require an
-  InstaCloud approval — `setup.sh` prints the `insta approvals approve <id>`
-  command to run, then re-run the script.
-- Remove everything when the demo is over: `insta project delete`.
 
 ## Serve your machine's tmux
 
