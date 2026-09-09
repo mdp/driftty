@@ -2,10 +2,10 @@
 #
 # driftty-on-instacloud demo setup.
 #
-# Creates an InstaCloud project (default: driftty-demo), adds an always-on
-# compute service, stores a stable demo password (and optional provider API
-# keys) as service secrets, deploys the driftty demo image, waits for it to
-# serve, and prints the URL and password.
+# Creates an InstaCloud project (default: driftty-demo) under the CURRENT
+# account's own org, adds an always-on compute service, stores a stable demo
+# password (and optional provider API keys) as service secrets, deploys the
+# driftty demo image, waits for it to serve, and prints the URL and password.
 #
 # Idempotent: safe to re-run. Optional overrides come from ./.env:
 #   DRIFTTY_TAG=edge            # image tag from ghcr.io/mdp/driftty-demo
@@ -23,7 +23,6 @@ cd "$(dirname "$0")"
 project=${DRIFTTY_INSTA_PROJECT:-driftty-demo}
 service_name=driftty
 port=7117
-image="ghcr.io/mdp/driftty-demo:${DRIFTTY_TAG:-edge}"
 
 # Load optional overrides from ./.env if present.
 if [ -f ./.env ]; then
@@ -32,6 +31,9 @@ if [ -f ./.env ]; then
   . ./.env
   set +a
 fi
+
+# Image tag from ./.env (DRIFTTY_TAG) — assigned AFTER .env is loaded.
+image="ghcr.io/mdp/driftty-demo:${DRIFTTY_TAG:-edge}"
 
 if ! command -v insta >/dev/null 2>&1; then
   echo "insta CLI not found. Install it, then re-run:" >&2
@@ -43,8 +45,10 @@ fi
 # surface the approval and stop rather than failing silently.
 gated() {
   local out err
+  set +e
   out="$("$@" 2>&1)"
   err=$?
+  set -e
   printf '%s\n' "$out"
   if [ $err -ne 0 ]; then
     if printf '%s' "$out" | grep -qiE 'approval required'; then
@@ -56,26 +60,40 @@ gated() {
   fi
 }
 
-# --- target check -----------------------------------------------------------
-insta status --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(f"target api: {d[\"apiUrl\"]}")' 2>/dev/null \
-  || insta status
+# Guarded JSON read: capture full output first, then parse (avoids EPIPE on
+# streaming commands and set -e survival).
+json() { # json <command...>  -> prints parsed JSON to stdout
+  local out
+  out="$("$@" 2>&1)" || true
+  printf '%s\n' "$out"
+}
 
-# --- project ----------------------------------------------------------------
-if ! insta project list --json | grep -q "\"name\": \"${project}\""; then
-  echo "==> Creating project ${project}"
-  insta project create "$project"
+# --- account + project context ---------------------------------------------
+status_json="$(json insta status --json)"
+email="$(printf '%s' "$status_json" | grep -m1 '"email"' | sed -E 's/.*"email": *"([^"]+)".*/\1/')"
+echo "Logged in as: ${email}"
+
+# Pin the CURRENT account's personal org so project create, services, and
+# deploys all land in one context.
+orgs_json="$(json insta org list --json)"
+org_id="$(printf '%s' "$orgs_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(o["id"] for o in d if o.get("is_personal")))')"
+echo "Active org:   ${org_id}"
+
+projects_json="$(json insta project list --json)"
+if ! printf '%s' "$projects_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if any(p["name"]==sys.argv[1] and p["org_id"]==sys.argv[2] for p in d) else 1)' "$project" "$org_id"; then
+  echo "==> Creating project ${project} (org ${org_id})"
+  gated insta project create "$project" --org "$org_id"
 else
-  echo "==> Project ${project} already exists"
+  echo "==> Project ${project} already exists in org ${org_id}"
 fi
 
-if ! insta status --json | grep -q "\"name\": \"${project}\""; then
-  echo "==> Linking project ${project}"
-  project_id="$(insta project list --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(p["id"] for p in d if p["name"]==sys.argv[1]))' "$project")"
-  insta project link "$project_id"
-fi
+project_id="$(insta project list --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(p["id"] for p in d if p["name"]==sys.argv[1] and p["org_id"]==sys.argv[2]))' "$project" "$org_id")"
+echo "==> Linking project ${project} (${project_id})"
+gated insta project link "$project_id"
 
 # --- compute service --------------------------------------------------------
-if ! insta services list --json | grep -q "\"name\": \"${service_name}\""; then
+services_json="$(json insta services list --json)"
+if ! printf '%s' "$services_json" | grep -q "\"name\": \"${service_name}\""; then
   echo "==> Adding always-on compute service ${service_name}"
   gated insta services add compute "$service_name" --always-on
 else

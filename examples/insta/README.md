@@ -61,7 +61,7 @@ Password: <the password>
 | `.env` value | Effect |
 | --- | --- |
 | `DRIFTTY_DEMO_PASSWORD` | Stable password; empty = generated and printed |
-| `DRIFTTY_TAG` | Image tag: `edge` (latest build of main) or `latest` (last release) |
+| `DRIFTTY_TAG` | Image tag: `edge` (latest build of main) or `latest` (last release). Until the multi-agent build is merged and published, use the `insta` tag: `ghcr.io/mdp/driftty-demo:insta` |
 | `OPENAI_API_KEY` | Injected as `OPENAI_API_KEY` for OpenCode and Codex |
 | `ANTHROPIC_API_KEY` | Injected as `ANTHROPIC_API_KEY` for Claude and Cline |
 | `DRIFTTY_INSTA_PROJECT` | InstaCloud project name (`driftty-demo` default) |
