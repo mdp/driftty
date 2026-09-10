@@ -32,6 +32,74 @@ routing to persistent tmux sessions.
   />
 </p>
 
+## Try the demo in the cloud (InstaCloud)
+
+One command puts the full multi-agent demo on a hosted VM with a password page:
+
+- A public HTTPS URL for your own microVM that opens on the driftty
+  **single-password login page**
+- Sign in, land on the terminal picker → **Local tmux → driftty-demo**
+- A tmux session with **OpenCode, Codex, Claude, and Cline** available plus a
+  launcher menu — pick one, configure it, and start coding in the browser
+
+```text
+browser -> https://<project>.compute.instacloud.com
+                -> /login (one master password) -> picker
+                -> tmux session (Menu + OpenCode/Codex/Claude/Cline/Shell/Readme)
+```
+
+You need the [insta CLI](https://docs.instacloud.com/introduction), logged in
+(`insta login`); nothing else — no Docker, keys, or Fly account. From this
+checkout:
+
+```sh
+cd examples/insta
+cp .env.example .env      # optional: set DRIFTTY_PASSWORD or provider keys
+./setup.sh
+```
+
+`setup.sh` is idempotent. It creates the project, adds an always-on compute
+service, stores the master password (generating one if empty) and any provider
+keys, deploys the image, waits for the login page to serve, and prints:
+
+```text
+driftty is running on InstaCloud
+URL: https://prod-main-driftty-<hash>.compute.instacloud-edge.com
+Password: <the password>
+```
+
+Open the URL and sign in with the master password — no username. Configure
+each agent on first use with `opencode auth login`, `codex login`, `claude`,
+or Cline's setup screen — or skip interactive login entirely by setting
+provider keys in `.env` (below). Reconnecting reattaches to the same tmux
+session; agent windows start as plain shells, so nothing runs until you pick
+one from the menu.
+
+Configuration lives in `examples/insta/.env`:
+
+| `.env` value | Effect |
+| --- | --- |
+| `DRIFTTY_PASSWORD` | Master password for the login page; empty = generated and printed |
+| `DRIFTTY_TAG` | Image tag to deploy (`gwdemo` = gateway demo, the default) |
+| `OPENAI_API_KEY` | Injected as `OPENAI_API_KEY` for OpenCode and Codex |
+| `ANTHROPIC_API_KEY` | Injected as `ANTHROPIC_API_KEY` for Claude and Cline |
+| `DRIFTTY_INSTA_PROJECT` | InstaCloud project name (default `driftty-demo`) |
+| `DRIFTTY_INSTA_SOURCE` | `1` to build the example's Dockerfile remotely instead of deploying the prebuilt image |
+
+Re-run `./setup.sh` to change the password or provider keys — secrets are
+injected on the next container start, and a changed password rotates existing
+browser sessions. Full walkthrough and caveats:
+[`examples/insta`](examples/insta). Notes:
+
+- Compute is rebuilt on redeploy, so agent logins (stored by the agents
+  themselves) do not survive one — the container is stateless by design.
+- One master password protects every terminal; treat the URL as a private
+  demo and rotate the password when you're done with it.
+- Gated actions (`services add`, `secrets set`, `deploy`) may require an
+  InstaCloud approval — `setup.sh` prints the `insta approvals approve <id>`
+  command to run, then re-run the script.
+- Remove everything when the demo is over: `insta project delete`.
+
 ## Try it in a minute
 
 With Docker running, paste this command:
@@ -52,7 +120,8 @@ versioned release. Add `--pull always` to `docker run` to check for updates.
 
 | Goal | Start here |
 | --- | --- |
-| Try Cline and OpenCode in a browser | [Run the Docker demo](#run-the-docker-demo) |
+| Try OpenCode, Codex, Claude, and Cline in a browser | [Run the Docker demo](#run-the-docker-demo) |
+| Put that demo on a hosted VM with a password page | [Deploy the demo on InstaCloud](#deploy-the-demo-on-instacloud) |
 | Reach this machine's tmux from a browser | [Serve your machine's tmux](#serve-your-machines-tmux) |
 | Reach another machine over SSH | [SSH to another machine](#ssh-to-another-machine) |
 
@@ -68,9 +137,10 @@ picker, stable URLs, SSH routing, and local tmux discovery.
 
 ## Run the Docker demo
 
-The demo image starts one persistent tmux session with tabs for Cline,
-OpenCode, and the project README, then serves it on a loopback port. It
-generates a password and prints the password and the page URL when it starts:
+The demo image starts one persistent tmux session with a launcher menu and
+tabs for the OpenCode, Codex, Claude, and Cline coding agents (plus a shell and
+the project README), then serves it on a loopback port. It generates a password
+and prints the password and the page URL when it starts:
 
 ```bash
 docker run --rm \
@@ -87,8 +157,12 @@ Password: <generated>
 ```
 
 Open <http://localhost:7117> and sign in with the password (username
-`driftty`). If you run detached, the same lines appear in `docker logs`. Choose
-a password and save it if you want to reuse it across runs:
+`driftty`). You land on the launcher menu: pick an agent to jump into its
+window and start it, then configure it there. The agent tabs start as plain
+shells, so nothing auto-starts — the agents run and self-update only when you
+launch them. If you run detached, the
+same lines appear in `docker logs`. Choose a password and save it if you want
+to reuse it across runs:
 
 ```bash
 docker run --rm \
@@ -97,7 +171,7 @@ docker run --rm \
   ghcr.io/mdp/driftty-demo:edge
 ```
 
-To give OpenCode access to the current directory:
+To give the agents access to the current directory:
 
 ```bash
 docker run --rm \
@@ -106,11 +180,26 @@ docker run --rm \
   ghcr.io/mdp/driftty-demo:edge
 ```
 
-Cline and OpenCode may ask for provider or account configuration on first use.
-If either agent exits, its tab continues as a Bash shell. Reconnecting attaches
-to the same `driftty-demo` session. Set `DRIFTTY_DEMO_URL` to correct the
-printed link when you publish the demo on another interface, and put it behind
-HTTPS if that interface is not loopback.
+Each agent may ask for provider or account configuration on first use —
+`opencode auth login`, `codex login`, `claude`, or Cline's setup screen. To
+skip interactive login for the providers you already have keys for, pass the
+keys as environment variables and the container exports them into every tab:
+
+```bash
+docker run --rm \
+  -p 127.0.0.1:7117:7117 \
+  -e DRIFTTY_DEMO_PASSWORD="your-saved-password" \
+  -e DRIFTTY_OPENAI_API_KEY="sk-..." \
+  -e DRIFTTY_ANTHROPIC_API_KEY="sk-ant-..." \
+  ghcr.io/mdp/driftty-demo:edge
+```
+
+`DRIFTTY_OPENAI_API_KEY` becomes `OPENAI_API_KEY` (used by OpenCode and Codex);
+`DRIFTTY_ANTHROPIC_API_KEY` becomes `ANTHROPIC_API_KEY` (used by Claude and
+Cline). When an agent exits, its tab continues as a Bash shell. Reconnecting
+attaches to the same `driftty-demo` session. Set `DRIFTTY_DEMO_URL` to correct
+the printed link when you publish the demo on another interface, and put it
+behind HTTPS if that interface is not loopback.
 
 ## Serve your machine's tmux
 
@@ -426,21 +515,10 @@ From the checkout:
 
 ```sh
 npm ci
-npm run env:encrypt
 npm run env:check
 npm run compose -- config --quiet
 npm run compose -- up -d --wait
 ```
-
-`env:encrypt` presents an interactive checklist of sensitive values found in
-`.env`, then replaces the selected plaintext values with device-local
-`varlock("local:...")` references. It is safe to run again after adding or
-changing a secret. Varlock decrypts those references when the `compose` wrapper
-runs. If Linux cannot use a keyring or TPM, Varlock reports that it is using its
-file-based local key; this still keeps the values out of plaintext files. The
-local key is required recovery material. Device-bound encrypted values are not
-portable, so reveal them interactively and re-encrypt them on a destination
-machine when migrating.
 
 The root schema requires the Cloudflare token. Its gateway password is optional,
 matching the generated-password behavior. Both deployment examples require a
@@ -448,9 +526,7 @@ password; the development schema also validates ports and user/group IDs.
 Use the example's own environment files with:
 
 ```sh
-npm run env:encrypt:cloudflare
 npm run compose:cloudflare -- up -d --wait
-npm run env:encrypt:development
 npm run compose:development -- run --build --rm keygen development
 npm run compose:development -- up --build -d --wait
 ```
@@ -459,18 +535,15 @@ For a copied example or release bundle, install the standalone Varlock CLI or
 use the pinned npm command from that deployment directory:
 
 ```sh
-npx --yes varlock@1.18.0 encrypt --file .env
 npx --yes varlock@1.18.0 load --agent
 npx --yes varlock@1.18.0 run --inject vars -- docker compose up -d --wait
 ```
 
 `load --agent` gives redacted diagnostics. Raw JSON, env/shell exports, and
 `printenv` can reveal secrets. Wrapping Compose validates and injects settings;
-local encryption protects the values stored in `.env`, while the Compose
-wrapper decrypts them only for the launched process. It does not hide the
-container environment from Docker administrators or protect output from later
-unwrapped commands. SSH private keys remain files in `keys/`. The one-command
-terminal trial needs no Varlock.
+it does not encrypt `.env` files, hide the container environment from Docker
+administrators, or protect output from later unwrapped commands. SSH private
+keys remain files in `keys/`. The one-command terminal trial needs no Varlock.
 
 ## Security and connection behavior
 
@@ -570,7 +643,7 @@ is published for AMD64 only. The `main` branch publishes
 | Image | Use it for | Persistence |
 | --- | --- | --- |
 | `ghcr.io/mdp/driftty` | One command or local shell | Lifetime of the command |
-| `ghcr.io/mdp/driftty-demo` | A ready-to-run coding-agent trial | Lifetime of the container |
+| `ghcr.io/mdp/driftty-demo` | A ready-to-run multi-agent trial: launcher menu, OpenCode/Codex/Claude/Cline tabs that start on demand, single-password or ttyd auth | Lifetime of the container |
 | `ghcr.io/mdp/driftty-gateway` | Local tmux, SSH hosts, and stable shell routes | Backed by host or remote tmux |
 
 ## Attribution

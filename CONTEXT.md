@@ -17,7 +17,8 @@ _Avoid_: Universal image, standalone gateway
 
 **Demo image**:
 A configured derivative of the mobile terminal image for trying driftty locally
-with an Alpine workspace, one tmux session, and a terminal coding agent.
+with an Alpine workspace, one tmux session, a launcher menu, and tabs for the
+OpenCode, Codex, Claude, and Cline coding agents.
 _Avoid_: Agent image, third deployment mode
 
 **Gateway bundle**:

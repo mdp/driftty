@@ -85,7 +85,14 @@ paste.txt
 examples/*/keys/*
 !examples/*/keys/.gitkeep
 
+# InstaCloud demo example state
+examples/insta/.env
+examples/insta/.insta/
+
 # Varlock generated local state
 .varlock/
 .env.local.key
 .env-flat/
+
+# Local agent credentials
+.insta/agent-session.json

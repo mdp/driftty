@@ -1,0 +1,8 @@
+.env
+.env.example
+.env.schema
+.gitignore
+.insta/
+keys/
+node_modules/
+setup.sh

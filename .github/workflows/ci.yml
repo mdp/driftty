@@ -147,8 +147,11 @@ jobs:
             test "$(id -u)" = 1000
             tmux has-session -t driftty-demo
             test "$(opencode --version)" = "$OPENCODE_VERSION"
+            test "$(codex --version)" = "codex-cli $CODEX_VERSION"
+            test "$(claude --version)" = "$CLAUDE_CODE_VERSION (Claude Code)"
             test "$(cline --version)" = "$CLINE_VERSION"
-            test "$(tmux list-windows -t driftty-demo -F "#{window_name}" | sort | tr "\\n" " ")" = "Cline OpenCode Readme "
+            test "$(tmux list-windows -t driftty-demo -F "#{window_name}" | sort | tr "\\n" " ")" = "Claude Cline Codex Menu OpenCode Readme Shell "
+            test -x /usr/local/bin/driftty-agent-menu
             test -s /workspace/README.md
           '
       - name: Verify all images contain the same mobile client
