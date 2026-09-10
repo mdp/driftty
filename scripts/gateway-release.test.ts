@@ -20,6 +20,7 @@ describe('gateway release contract', () => {
     await mkdir(join(root, 'release'));
     await writeFile(join(root, 'compose.yaml'), 'services: {}\n');
     await writeFile(join(root, 'profiles.example.yaml'), 'profiles: []\n');
+    await writeFile(join(root, '.env.schema'), '# @sensitive\nCLOUDFLARE_TUNNEL_TOKEN=\n');
     await writeFile(
       join(root, '.env.example'),
       'CLOUDFLARE_TUNNEL_TOKEN=replace-me\n# DRIFTTY_TAG=latest\n',
@@ -36,6 +37,8 @@ describe('gateway release contract', () => {
     expect(extracted.stdout).toContain('CLOUDFLARE_TUNNEL_TOKEN=replace-me');
     expect(extracted.stdout).toContain('DRIFTTY_TAG=3.2.1');
     expect(extracted.stdout).not.toContain('DRIFTTY_TAG=latest');
+    expect(spawnSync('tar', ['-xOf', archive, 'driftty-3.2.1/.env.schema'],
+      {encoding: 'utf8'}).stdout).toContain('@sensitive');
     expect(await readFile(archive)).not.toHaveLength(0);
   });
 

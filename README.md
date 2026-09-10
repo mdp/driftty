@@ -384,7 +384,39 @@ This profile appears at `/baz/`; its pinned terminal is `/baz/main/`; newly
 created sessions get stable URLs of their own.
 
 `slug`, `label`, `host`, `user`, and `key` are required. `port` defaults to
-22. Profiles sharing a host are grouped together; `host_label` sets the group
+22. Profiles sharing a host are grouped together under one heading; inside a
+host, sessions are bucketed by `user`, and each user gets its own **+** button
+that creates a session as that user. Two profiles for the same host with
+different users look like this:
+
+```yaml
+profiles:
+  - slug: istanbul-mdp
+    label: MDP terminal
+    host_label: Istanbul
+    host: istanbul.example.net
+    user: mdp
+    key: istanbul-mdp
+    sessions:
+      - name: main
+        label: Main terminal
+        directory: /home/mdp
+    new_sessions:
+      directory: /home/mdp
+      prefix: ttyd-mdp-
+  - slug: istanbul-mdp-1984
+    label: MDP-1984 terminal
+    host_label: Istanbul
+    host: istanbul.example.net
+    user: mdp-1984
+    key: istanbul-mdp-1984
+    new_sessions:
+      directory: /home/mdp-1984
+      prefix: ttyd-mdp-1984-
+```
+
+Both appear under the **Istanbul** heading as separate user groups, each able to
+create its own sessions. `host_label` sets the group
 heading and defaults to `label`. The gateway validates key paths, duplicate
 names, incompatible routing options, and session limits before it starts.
 

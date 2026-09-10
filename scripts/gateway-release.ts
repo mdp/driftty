@@ -1,7 +1,7 @@
 import {cp, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
 
-const bundleFiles = ['compose.yaml', 'profiles.example.yaml'] as const;
+const bundleFiles = ['compose.yaml', 'profiles.example.yaml', '.env.schema'] as const;
 
 function releaseVersion(requestedVersion: string): string {
   const version = requestedVersion.replace(/^v/, '');

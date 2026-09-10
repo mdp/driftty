@@ -85,6 +85,7 @@ describe('gateway plan', () => {
       label: 'Baz',
       hostLabel: 'Baz',
       hostGroup: 'host-1',
+      user: 'mark',
       mode: 'direct',
       canCreateSessions: false,
     }]);
@@ -103,7 +104,7 @@ describe('gateway plan', () => {
     expect(plan.get('baz')).toBe(plan.direct[0]);
   });
 
-  test('groups multiple public views without passing hostnames to the picker', async () => {
+  test('groups multiple public views by host without passing hostnames to the picker', async () => {
     const plan = await parseGatewayPlan(`profiles:
   - slug: login
     label: Login
@@ -115,13 +116,14 @@ describe('gateway plan', () => {
     label: Shells
     host_label: Monaco
     host: secret.example.net
-    user: mark
+    user: ada
     key: shells
     sessions: []
 `, {checkKeys: false});
 
     expect(plan.views.map(({hostGroup}) => hostGroup))
       .toEqual(['host-1', 'host-1']);
+    expect(plan.views.map(({user}) => user)).toEqual(['mark', 'ada']);
     expect(JSON.stringify(plan.views)).not.toContain('secret.example.net');
   });
 

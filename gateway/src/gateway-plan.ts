@@ -8,6 +8,8 @@ export interface GatewayProfileView {
   label: string;
   hostLabel: string;
   hostGroup: string;
+  /** SSH user for this profile; absent for local tmux mode. */
+  user?: string;
   mode: 'direct' | 'registry';
   canCreateSessions: boolean;
   localTmux?: boolean;
@@ -278,6 +280,7 @@ export async function parseGatewayPlan(
     }
     const label = required(value.label, 'label', index);
     const host = required(value.host, 'host', index);
+    const userValue = required(value.user, 'user', index);
     const autorun = value.autorun === undefined
       ? undefined
       : required(value.autorun, 'autorun', index);
@@ -311,6 +314,7 @@ export async function parseGatewayPlan(
         optionalString(value.host_label, 'host_label', `profile ${index + 1}`)
         ?? label,
       hostGroup,
+      user: userValue,
       mode: registryMode ? 'registry' : 'direct',
       canCreateSessions: Boolean(managed),
     };
@@ -318,7 +322,7 @@ export async function parseGatewayPlan(
       slug,
       host,
       port,
-      user: required(value.user, 'user', index),
+      user: userValue,
       keyPath: join(keysDir, key),
     };
     return registryMode
