@@ -12,6 +12,14 @@ browser -> https://<project>.compute.instacloud.com
                 -> tmux session (Menu + 4 agent tabs)
 ```
 
+## Let a coding agent do it
+
+Paste [`prompt.md`](./prompt.md) into any coding agent (Claude Code, Codex,
+Cursor, OpenCode, or similar). It installs and signs in to the `insta` CLI,
+clones driftty, runs `setup.sh`, and reports the URL and password. The
+[main README](../../README.md#set-it-up-with-a-coding-agent) embeds the same
+prompt as a plain-text block you can copy.
+
 ## What you need
 
 - The `insta` CLI, logged in to InstaCloud: `curl -fsSL https://agents.instacloud.com | sh`

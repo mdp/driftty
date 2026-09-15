@@ -32,7 +32,45 @@ routing to persistent tmux sessions.
   />
 </p>
 
-## Try the demo in the cloud (InstaCloud)
+## Set it up with a coding agent
+
+Copy this prompt into any coding agent (Claude Code, Codex, Cursor, OpenCode,
+or similar). It installs the [insta CLI](https://docs.instacloud.com/introduction),
+signs in, clones driftty, and deploys the hosted demo:
+
+```text
+Set me up with the driftty multi-agent demo on InstaCloud.
+
+Install the insta CLI and its agent skill with `npx -y insta@latest setup agent`
+(macOS/Linux fallback if npx fails or Node is missing:
+`curl -fsSL agents.instacloud.com | sh`). Then sign in: check `insta status`,
+and if needed run `insta login --oauth github`, or on a headless machine
+`insta login --device` and wait for me to approve the printed link.
+
+Clone https://github.com/mdp/driftty (or use the checkout you are already in)
+and cd into it.
+
+Run the hosted demo setup: `cd examples/insta && cp .env.example .env &&
+./setup.sh`. setup.sh is idempotent: it creates the InstaCloud project, adds an
+always-on compute service, stores the master password and any provider keys,
+deploys the demo image, and prints the public URL and password. If a command
+says "approval required", run the printed `insta approvals approve <id>` with
+me, then re-run setup.sh.
+
+Verify with `insta status` and `insta manifest`, then report the public URL and
+how to sign in (single master password, then pick Local tmux -> driftty-demo).
+Do not print secret values.
+
+The full instructions are in examples/insta/prompt.md.
+```
+
+The same prompt is served at
+[`examples/insta/prompt.md`](examples/insta/prompt.md)
+([raw](https://raw.githubusercontent.com/mdp/driftty/main/examples/insta/prompt.md))
+for agents that prefer to fetch it. Prefer to run the steps yourself? See
+[Set it up manually](#set-it-up-manually-on-instacloud).
+
+## Set it up manually on InstaCloud
 
 One command puts the full multi-agent demo on a hosted VM with a password page:
 
@@ -48,12 +86,15 @@ browser -> https://<project>.compute.instacloud.com
                 -> tmux session (Menu + OpenCode/Codex/Claude/Cline/Shell/Readme)
 ```
 
-You need the [insta CLI](https://docs.instacloud.com/introduction), logged in
-(`insta login`); nothing else — no Docker, keys, or Fly account. From this
-checkout:
+You need `git` and the [insta CLI](https://docs.instacloud.com/introduction),
+logged in (`insta login`); nothing else — no Docker, keys, or Fly account. If
+the CLI is not installed yet, install it with
+`npx -y insta@latest setup agent` (macOS/Linux fallback:
+`curl -fsSL agents.instacloud.com | sh`). Then clone and run:
 
 ```sh
-cd examples/insta
+git clone https://github.com/mdp/driftty
+cd driftty/examples/insta
 cp .env.example .env      # optional: set DRIFTTY_PASSWORD or provider keys
 ./setup.sh
 ```
@@ -121,7 +162,7 @@ versioned release. Add `--pull always` to `docker run` to check for updates.
 | Goal | Start here |
 | --- | --- |
 | Try OpenCode, Codex, Claude, and Cline in a browser | [Run the Docker demo](#run-the-docker-demo) |
-| Put that demo on a hosted VM with a password page | [Deploy the demo on InstaCloud](#deploy-the-demo-on-instacloud) |
+| Put that demo on a hosted VM with a password page | [Set it up with a coding agent](#set-it-up-with-a-coding-agent) or [manually](#set-it-up-manually-on-instacloud) |
 | Reach this machine's tmux from a browser | [Serve your machine's tmux](#serve-your-machines-tmux) |
 | Reach another machine over SSH | [SSH to another machine](#ssh-to-another-machine) |
 
