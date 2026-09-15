@@ -48,7 +48,7 @@ To reach your own shells or try the coding tools, choose a setup below.
 `edge` tracks the latest successful build of `main`; `latest` tracks the last
 versioned release. Add `--pull always` to `docker run` to check for updates.
 
-## Set it up with a coding agent
+## Set it up with a coding agent (uses [Instacloud](https://www.instacloud.com/) for VM)
 
 Copy this prompt into any coding agent (Claude Code, Codex, Cursor, OpenCode,
 or similar). It installs the [insta CLI](https://docs.instacloud.com/introduction),
