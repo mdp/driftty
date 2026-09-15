@@ -12,13 +12,9 @@ browser -> https://<project>.compute.instacloud.com
                 -> tmux session (Menu + 4 agent tabs)
 ```
 
-## Let a coding agent do it
-
-Paste [`prompt.md`](./prompt.md) into any coding agent (Claude Code, Codex,
-Cursor, OpenCode, or similar). It installs and signs in to the `insta` CLI,
-clones driftty, runs `setup.sh`, and reports the URL and password. The
-[main README](../../README.md#set-it-up-with-a-coding-agent) embeds the same
-prompt as a plain-text block you can copy.
+> Prefer to let an agent do it? The
+> [main README](../../README.md#set-it-up-with-a-coding-agent) has a single
+> copy-paste prompt for any coding agent. The steps below are the manual setup.
 
 ## What you need
 
@@ -32,7 +28,8 @@ prompt as a plain-text block you can copy.
 ## Run the demo
 
 ```sh
-cd examples/insta
+git clone https://github.com/mdp/driftty
+cd driftty/examples/insta
 cp .env.example .env     # optional: set DRIFTTY_PASSWORD / provider keys
 ./setup.sh
 ```
