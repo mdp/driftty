@@ -527,6 +527,11 @@ export class Terminal extends Component<Props, State> {
 
   @bind
   closeComposer() {
+    saveComposerDraft(
+      window.sessionStorage,
+      window.location.pathname,
+      this.state.composerValue,
+    );
     this.returnToTerminal(() => {
       if (!this.mobileClient) this.xterm.focus();
     });
@@ -534,9 +539,7 @@ export class Terminal extends Component<Props, State> {
 
   @bind
   updateComposer(value: string) {
-    if (!this.state.composerHistoryActive) {
-      saveComposerDraft(window.sessionStorage, window.location.pathname, value);
-    }
+    saveComposerDraft(window.sessionStorage, window.location.pathname, value);
     this.setState({ composerValue: value });
   }
 
@@ -570,6 +573,7 @@ export class Terminal extends Component<Props, State> {
     if (!this.state.composerHistoryActive) {
       this.composerDraftBackup = this.state.composerValue;
     }
+    saveComposerDraft(window.sessionStorage, window.location.pathname, value);
     this.setState({composerValue: value, composerHistoryActive: true});
   }
 
