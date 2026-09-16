@@ -19,6 +19,8 @@ import {measureVisualViewport} from '../../visual-viewport';
 import type {ComposerSubmission} from '../voice-composer/actions';
 import {
   loadComposerDraft,
+  loadComposerHistory,
+  recordComposerHistory,
   saveComposerDraft,
 } from '../voice-composer/draft';
 import {
@@ -49,6 +51,8 @@ interface State {
   viewportHeight: number;
   viewportOffsetTop: number;
   composerValue: string;
+  composerHistory: string[];
+  composerHistoryActive: boolean;
   reconnectRequired: boolean;
   exited: boolean;
   connectionState: ConnectionState;
@@ -72,6 +76,7 @@ export class Terminal extends Component<Props, State> {
   private layoutWidth = window.innerWidth;
   private quickbarLayoutReady = false;
   private readonly mobileClient: boolean;
+  private composerDraftBackup?: string;
   private ctrlTimer?: number;
   private selectionAdjustment?: {
     type: TouchSelectionAdjustment;
@@ -105,6 +110,11 @@ export class Terminal extends Component<Props, State> {
         window.sessionStorage,
         window.location.pathname
       ),
+      composerHistory: loadComposerHistory(
+        window.sessionStorage,
+        window.location.pathname,
+      ),
+      composerHistoryActive: false,
       reconnectRequired: false,
       exited: false,
       connectionState: 'connecting',
@@ -174,6 +184,8 @@ export class Terminal extends Component<Props, State> {
       viewportHeight,
       viewportOffsetTop,
       composerValue,
+      composerHistory,
+      composerHistoryActive,
       reconnectRequired,
       exited,
       connectionState,
@@ -331,11 +343,15 @@ export class Terminal extends Component<Props, State> {
             ctrlArmed={ctrlArmed}
             mobile={this.mobileClient}
             value={composerValue}
+            history={composerHistory}
+            historyActive={composerHistoryActive}
             onChange={this.updateComposer}
             onTerminalAction={this.sendTerminalAction}
             onToggleCtrl={this.toggleCtrl}
             onSend={this.sendComposer}
             onClose={this.closeComposer}
+            onHistorySelect={this.selectComposerHistory}
+            onHistoryBack={this.restoreComposerDraft}
           />
         )}
         {showTerminalMenu && (
@@ -511,6 +527,11 @@ export class Terminal extends Component<Props, State> {
 
   @bind
   closeComposer() {
+    saveComposerDraft(
+      window.sessionStorage,
+      window.location.pathname,
+      this.state.composerValue,
+    );
     this.returnToTerminal(() => {
       if (!this.mobileClient) this.xterm.focus();
     });
@@ -518,16 +539,20 @@ export class Terminal extends Component<Props, State> {
 
   @bind
   updateComposer(value: string) {
-    saveComposerDraft(
-      window.sessionStorage,
-      window.location.pathname,
-      value
-    );
+    saveComposerDraft(window.sessionStorage, window.location.pathname, value);
     this.setState({ composerValue: value });
   }
 
   @bind
   sendComposer({text, enter}: ComposerSubmission) {
+    if (text) {
+      const composerHistory = recordComposerHistory(
+        window.sessionStorage,
+        window.location.pathname,
+        text,
+      );
+      this.setState({composerHistory});
+    }
     try {
       this.xterm.paste(text);
       if (enter) this.xterm.sendData('\r');
@@ -537,9 +562,34 @@ export class Terminal extends Component<Props, State> {
     saveComposerDraft(window.sessionStorage, window.location.pathname, '');
     this.clearCtrl();
     this.returnToTerminal(() => {
-      this.setState({composerValue: ''});
+      this.composerDraftBackup = undefined;
+      this.setState({composerValue: '', composerHistoryActive: false});
       if (!this.mobileClient) this.xterm.focus();
     });
+  }
+
+  @bind
+  selectComposerHistory(value: string) {
+    if (!this.state.composerHistoryActive) {
+      this.composerDraftBackup = this.state.composerValue;
+    }
+    saveComposerDraft(window.sessionStorage, window.location.pathname, value);
+    this.setState({composerValue: value, composerHistoryActive: true});
+  }
+
+  @bind
+  restoreComposerDraft() {
+    this.setState({
+      composerValue: this.composerDraftBackup ?? '',
+      composerHistoryActive: false,
+    }, () => {
+      saveComposerDraft(
+        window.sessionStorage,
+        window.location.pathname,
+        this.state.composerValue,
+      );
+    });
+    this.composerDraftBackup = undefined;
   }
 
   @bind
