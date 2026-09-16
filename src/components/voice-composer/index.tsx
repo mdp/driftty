@@ -12,11 +12,15 @@ interface Props {
   ctrlArmed: boolean;
   mobile: boolean;
   value: string;
+  history?: string[];
+  historyActive?: boolean;
   onChange: (value: string) => void;
   onTerminalAction: (action: TerminalAction) => void;
   onToggleCtrl: () => void;
   onSend: (submission: ComposerSubmission) => void;
   onClose: () => void;
+  onHistorySelect?: (value: string) => void;
+  onHistoryBack?: () => void;
 }
 
 interface State {
@@ -50,6 +54,10 @@ export class VoiceComposer extends Component<Props, State> {
       ctrlArmed,
       mobile,
       value,
+      history = [],
+      historyActive = false,
+      onHistorySelect,
+      onHistoryBack,
       onChange,
       onTerminalAction,
       onToggleCtrl,
@@ -77,6 +85,32 @@ export class VoiceComposer extends Component<Props, State> {
             Close
           </button>
         </header>
+        {history.length > 0 && (
+          <details class="voice-composer__history">
+            <summary>History ({history.length})</summary>
+            <div class="voice-composer__history-list">
+              {history.map((entry, index) => (
+                <button
+                  type="button"
+                  key={`${index}-${entry}`}
+                  class="voice-composer__history-item"
+                  onClick={() => this.selectHistory(entry)}
+                >
+                  <span>{entry}</span>
+                </button>
+              ))}
+              {historyActive && (
+                <button
+                  type="button"
+                  class="voice-composer__history-back"
+                  onClick={() => onHistoryBack?.()}
+                >
+                  Back to draft
+                </button>
+              )}
+            </div>
+          </details>
+        )}
         <textarea
           ref={(element) => {
             this.textarea = element ?? undefined;
@@ -200,6 +234,17 @@ export class VoiceComposer extends Component<Props, State> {
     if (!value && action === 'insert') return;
     this.textarea?.blur();
     onSend(composerSubmission(value, action));
+  }
+
+  private selectHistory(value: string) {
+    this.props.onHistorySelect?.(value);
+    requestAnimationFrame(() => {
+      const textarea = this.textarea;
+      if (!textarea) return;
+      textarea.focus();
+      const end = textarea.value.length;
+      textarea.setSelectionRange(end, end);
+    });
   }
 
   private close = () => {

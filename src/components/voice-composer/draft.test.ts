@@ -3,6 +3,9 @@ import {
   composerDraftKey,
   loadComposerDraft,
   saveComposerDraft,
+  composerHistoryKey,
+  loadComposerHistory,
+  recordComposerHistory,
 } from './draft';
 
 describe('composer drafts', () => {
@@ -46,5 +49,29 @@ describe('composer drafts', () => {
     expect(storage.removeItem).toHaveBeenCalledWith(
       'ttyd-mobile:composer-draft:/aachen/mdp'
     );
+  });
+
+  test('loads history safely and isolates it by route', () => {
+    expect(composerHistoryKey('/aachen/mdp/')).toBe(
+      'ttyd-mobile:composer-history:/aachen/mdp',
+    );
+    expect(loadComposerHistory({
+      getItem: () => JSON.stringify(['five', '', 4, 'four', 'three']),
+    }, '/aachen/mdp')).toEqual(['five', 'four', 'three']);
+    expect(loadComposerHistory({getItem: () => '{bad'}, '/aachen/mdp')).toEqual([]);
+  });
+
+  test('records newest entries, removes duplicates, and keeps five', () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    };
+    for (const value of ['one', 'two', 'three', 'four', 'five', 'six']) {
+      recordComposerHistory(storage, '/aachen/mdp', value);
+    }
+    expect(recordComposerHistory(storage, '/aachen/mdp', 'four')).toEqual([
+      'four', 'six', 'five', 'three', 'two',
+    ]);
   });
 });
