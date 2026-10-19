@@ -139,21 +139,13 @@ the upstream fix are pending.
 
 ### 1. Quick fix that is already deployed: strip the offer at the gateway
 
-The gateway's Caddy reverse proxy deletes `Sec-WebSocket-Extensions` from the
+The gateway's in-process reverse proxy deletes `Sec-WebSocket-Extensions` from the
 upstream handshake so ttyd never negotiates compression. Because the browser
 still *offers* compression but the server no longer accepts it, the session
 runs without `permessage-deflate` and the boundary/content triggers disappear.
 
-```caddyfile
-reverse_proxy 127.0.0.1:7800 {
-    header_up -Sec-WebSocket-Extensions
-}
-```
-
-This is implemented in `gateway/src/caddy.ts` as the `proxyCompressionUpstream()`
-helper, applied to every upstream block, and verified end to end. It is covered
-by a regression test in `gateway/src/caddy.test.ts` asserting every
-`reverse_proxy` upstream strips the header.
+This is implemented in `gateway/src/http-proxy.ts`, applied to every HTTP and
+WebSocket upstream, and covered by a real socket-level WebSocket proxy test.
 
 Terminal input is small, interactive, and latency-sensitive, so losing transport
 compression is not a meaningful cost for this product.
@@ -180,7 +172,7 @@ Proposed steps:
 5. Run a large (2048/4096/20000-byte) paste through real Chromium with ordinary
    `Ctrl+V`, asserting the WebSocket stays open and the terminal receives the
    complete UTF-8 payload.
-6. Repeat through Caddy and the deployed Cloudflare tunnel.
+6. Repeat through the in-process gateway and the deployed Cloudflare tunnel.
 7. Run frontend tests, gateway tests, production builds, image smoke tests, and
    multi-architecture (AMD64/ARM64) image builds.
 8. Run the check at least ten times plus a larger multiline Unicode paste so the
@@ -253,10 +245,8 @@ survived, so no running work was lost.
 
 ## Repository fixtures
 
-- `gateway/src/caddy.ts` — `proxyCompressionUpstream()` adds
-  `header_up -Sec-WebSocket-Extensions` to every upstream block (fix level 1).
-- `gateway/src/caddy.test.ts` — regression test asserting every upstream strips
-  the header.
+- `gateway/src/http-proxy.ts` — strips the extension offer on HTTP proxy routes
+  and WebSocket upgrade handshakes (fix level 1).
 - The private incident trigger (`paste.txt`) is intentionally not committed and
   is recorded only by byte/character count and SHA-256; `.gitignore` excludes it.
 

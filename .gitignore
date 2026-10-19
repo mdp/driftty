@@ -78,6 +78,9 @@ keys/*
 !keys/.gitkeep
 config/profiles.yaml
 
+# Personal Driftty configuration (contains credentials and workspace state).
+/driftty-mdp-config/
+
 # Private incident artifacts (never commit paste/trigger content)
 paste.txt
 
@@ -96,3 +99,7 @@ examples/insta/.insta/
 
 # Local agent credentials
 .insta/agent-session.json
+
+# InstaCloud: local observe-hook state (regenerated per machine, not source)
+.insta/observe/
+.insta/audit.jsonl

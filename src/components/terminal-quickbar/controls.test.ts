@@ -1,5 +1,9 @@
 import {describe, expect, it} from 'vitest';
-import {quickbarControls, scrollControls} from './controls';
+import {
+  quickbarControls,
+  quickbarControlSequence,
+  scrollControls,
+} from './controls';
 
 describe('Quickbar contextual controls', () => {
   it.each([
@@ -27,5 +31,11 @@ describe('Quickbar contextual controls', () => {
       control: 'C',
       danger: true,
     });
+  });
+
+  it('maps every shared control shape to terminal input', () => {
+    expect(quickbarControlSequence({label: 'Tab', action: 'tab'})).toBe('\t');
+    expect(quickbarControlSequence({label: 'C', control: 'C'})).toBe('\x03');
+    expect(quickbarControlSequence({label: '$', text: '$'})).toBe('$');
   });
 });

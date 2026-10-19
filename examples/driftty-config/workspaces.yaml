@@ -1,0 +1,10 @@
+projects:
+  - id: example-app
+    label: Example app
+    provider: vercel
+    repository:
+      url: https://github.com/example/app.git
+      directory: /workspace/example-app
+    secrets:
+      env:
+        GH_TOKEN: shared:GITHUB_TOKEN

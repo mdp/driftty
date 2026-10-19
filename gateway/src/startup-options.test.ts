@@ -7,6 +7,7 @@ describe('gateway startup options', () => {
       '--local-tmux', '/run/host-tmux/default', '--no-auth',
     ])).toEqual({
       localTmux: '/run/host-tmux/default',
+      remoteTerminal: undefined,
       authArguments: ['--no-auth'],
     });
   });
@@ -16,6 +17,8 @@ describe('gateway startup options', () => {
     ['--local-tmux'],
     ['--local-tmux', '--no-auth'],
     ['--local-tmux', '/one', '--local-tmux', '/two'],
+    ['--remote-terminal'],
+    ['--remote-terminal', 'https://one.vercel.run', '--remote-terminal', 'https://two.vercel.run'],
     ['--no-auth', '--no-auth'],
   ])('rejects unknown, incomplete, or duplicate arguments: %p', (args) => {
     expect(() => parseGatewayStartupOptions(args)).toThrow();

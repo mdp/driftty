@@ -2,6 +2,7 @@ import {Component, h} from 'preact';
 import type {TerminalAction} from '../terminal-actions';
 import {
   loadQuickbarMode,
+  quickbarModes,
   saveQuickbarMode,
   type QuickbarMode,
 } from './mode';
@@ -104,7 +105,7 @@ export class TerminalQuickbar extends Component<Props, State> {
           </span>
         )}
         <div class="terminal-quickbar__modes" aria-label="Quickbar mode">
-          {(['agent', 'nav', 'tmux', 'ctrl', 'copy'] as QuickbarMode[]).map(
+          {quickbarModes.map(
             (mode) => (
               <button
                 key={mode}

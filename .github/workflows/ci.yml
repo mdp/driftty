@@ -162,14 +162,26 @@ jobs:
           test -n "$generic_client"
           test "$generic_client" = "$demo_client"
           test "$generic_client" = "$gateway_client"
-      - name: Validate generated Caddy configuration
+      - name: Test Node gateway runtime
         run: |
-          bun -e "import {caddyConfig} from './gateway/src/caddy.ts'; await Bun.write('/tmp/Caddyfile', caddyConfig([{slug:'baz',ttydPort:7800}], []));"
-          docker run --rm -v /tmp/Caddyfile:/tmp/Caddyfile:ro --entrypoint caddy driftty-gateway:test validate --config /tmp/Caddyfile --adapter caddyfile
+          id=$(docker run -d --name driftty-node-gateway -p 17682:7681 \
+            -e DRIFTTY_REMOTE_TERMINAL_AUTH=dGVzdA== \
+            --entrypoint node driftty-gateway:test \
+            --experimental-transform-types /opt/driftty/src/main.ts \
+            --no-auth --remote-terminal https://example.com)
+          trap 'docker rm -f "$id" >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:17682/_health >/dev/null && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:17682/ | grep -q 'DRIFTTY // SECURE LINK'
+
+  native:
+    uses: ./.github/workflows/native.yml
 
   publish-edge:
     if: github.event_name == 'push'
-    needs: test
+    needs: [test, native]
     permissions:
       contents: read
       packages: write

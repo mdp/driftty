@@ -3,7 +3,7 @@ import {pickerResponse, sessionsResponse, unavailableResponse} from './picker';
 import type {GatewayProfileView} from './gateway-plan';
 
 const profile = (slug: string, label: string, user = 'mark'): GatewayProfileView => ({
-  slug, label, hostLabel: 'Monaco', hostGroup: 'host-1', user,
+  slug, label, hostLabel: 'Istanbul', hostGroup: 'host-1', user,
   mode: 'direct', canCreateSessions: false,
 });
 
@@ -20,7 +20,7 @@ describe('host picker', () => {
     const response = pickerResponse([profile('baz', 'Baz')]);
     const body = await response.text();
     expect(response.status).toBe(200);
-    expect(body).toContain('<h2>Monaco</h2>');
+    expect(body).toContain('<h2>Istanbul</h2>');
     expect(body).toContain('href="/baz/"');
     expect(body).toContain('<h3>mark</h3>');
   });
@@ -39,10 +39,69 @@ describe('host picker', () => {
     expect(await response.text()).not.toContain('/logout');
   });
 
+  test('shows Vercel workspaces in the root picker with direct session links', async () => {
+    const response = pickerResponse([], new Map(), undefined, true, [{
+      name: 'driftty-demo', project: 'driftty', state: 'ready', branch: 'main',
+    }], [{id: 'driftty', label: 'Driftty'}]);
+    const body = await response.text();
+    expect(body).toContain('<h2 class="section-title">Projects</h2>');
+    expect(body).toContain('<h2>Driftty</h2>');
+    expect(body).toContain('action="/_projects/driftty/workspaces"');
+    expect(body).toContain('>Vercel</span>');
+    expect(body).toContain('href="/sessions/driftty-demo/"');
+    expect(body).toContain('driftty · main');
+    expect(body).toContain('class="state state-ready">running</span>');
+    expect(body).toContain('Vercel <strong>1 running</strong> · 0 starting · 0 suspended · 0 failed');
+    expect(body).toContain('tmux <strong>0 running</strong> · 0 attached · 0 detached');
+    expect(body).toContain('action="/_workspaces/driftty-demo/stop"');
+    expect(body).toContain('action="/_workspaces/driftty-demo/delete"');
+    expect(body).toContain('Confirm delete');
+    expect(body).toContain('href="/logout"');
+  });
+
+  test('links non-ready Vercel workspaces to their state page', async () => {
+    const response = pickerResponse([], new Map(), undefined, false, [{
+      name: 'driftty-booting', project: 'driftty', state: 'provisioning', branch: null,
+    }], [{id: 'driftty', label: 'Driftty'}]);
+    const body = await response.text();
+    expect(body).toContain('href="/sessions/driftty-booting"');
+    expect(body).toContain('driftty');
+    expect(body).toContain('class="state state-provisioning">provisioning</span>');
+    expect(body).toContain('0 running</strong> · 1 starting · 0 suspended · 0 failed');
+    expect(body).toContain('action="/_workspaces/driftty-booting/delete"');
+    expect(body).not.toContain('action="/_workspaces/driftty-booting/stop"');
+  });
+
+  test('offers run for suspended workspaces and retry for failed ones', async () => {
+    const response = pickerResponse([], new Map(), undefined, false, [
+      {name: 'driftty-sleep', project: 'driftty', state: 'stopped', branch: null},
+      {name: 'driftty-broken', project: 'driftty', state: 'failed', branch: null},
+    ], [{id: 'driftty', label: 'Driftty'}]);
+    const body = await response.text();
+    expect(body).toContain('action="/_workspaces/driftty-sleep/resume"');
+    expect(body).toContain('>Run</button>');
+    expect(body).toContain('action="/_workspaces/driftty-broken/retry"');
+  });
+
+  test('distinguishes running, attached, detached, and unavailable tmux sessions', async () => {
+    const registry = profile('host', 'Host');
+    registry.mode = 'registry';
+    const response = pickerResponse([registry], new Map([['host', [
+      {slug: 'attached', name: 'attached', label: 'Attached', created: 0, attached: 1, managed: false, available: true},
+      {slug: 'detached', name: 'detached', label: 'Detached', created: 0, attached: 0, managed: true, available: true},
+      {slug: 'offline', name: 'offline', label: 'Offline', created: 0, attached: 0, managed: false, available: false},
+    ]]]));
+    const body = await response.text();
+    expect(body).toContain('running · attached ×1');
+    expect(body).toContain('running · detached');
+    expect(body).toContain('not running');
+    expect(body).toContain('tmux <strong>2 running</strong> · 1 attached · 1 detached');
+  });
+
   test('shows labels for multiple profiles without connection details', async () => {
     const response = pickerResponse([profile('baz', 'Baz'), profile('qux', 'Qux')]);
     const body = await response.text();
-    expect(body).toContain('<h2>Monaco</h2>');
+    expect(body).toContain('<h2>Istanbul</h2>');
     expect(body).toContain('Baz');
     expect(body).toContain('Qux');
     expect(body).toContain('href="/baz/"');
@@ -52,13 +111,13 @@ describe('host picker', () => {
   });
 
   test('flattens routed sessions into their host group with a named creation form', async () => {
-    const login = profile('monaco', 'Name profile');
-    const shells = profile('monaco-shells', 'Monaco shells');
+    const login = profile('istanbul', 'Name profile');
+    const shells = profile('istanbul-shells', 'Istanbul shells');
     shells.mode = 'registry';
     shells.canCreateSessions = true;
     const response = pickerResponse(
       [login, shells],
-      new Map([['monaco-shells', [{
+      new Map([['istanbul-shells', [{
         slug: 'clever-turing', name: 'ttyd-clever-turing',
         label: 'clever-turing', created: 1785140000, attached: 0,
         managed: true, available: true,
@@ -67,16 +126,18 @@ describe('host picker', () => {
     );
     const body = await response.text();
 
-    expect(body.match(/<h2>Monaco<\/h2>/g)).toHaveLength(1);
-    expect(body).toContain('href="/monaco/"');
-    expect(body).toContain('href="/monaco-shells/clever-turing/"');
-    expect(body).toContain('action="/monaco-shells/sessions"');
     expect(body).toContain('<h3>mark</h3>');
+    expect(body.match(/<h2>Istanbul<\/h2>/g)).toHaveLength(1);
+    expect(body).toContain('href="/istanbul/"');
+    expect(body).toContain('href="/istanbul-shells/clever-turing/"');
+    expect(body).toContain('action="/istanbul-shells/sessions"');
+    expect(body).toContain('<h2 class="section-title">Hosts</h2>');
+    expect(body).toContain('Create a blank SSH session');
     expect(body).toContain('name="name"');
     expect(body).toContain('value="bold-wu"');
     expect(body).toContain('onfocus="this.select()"');
     expect(body).toContain("toLowerCase().replace(/\\s+/g,'-')");
-    expect(body).not.toContain('>Monaco shells<');
+    expect(body).not.toContain('>Istanbul shells<');
   });
 
   test('buckets sessions by host then user with a per-user create form', async () => {
@@ -105,7 +166,7 @@ describe('host picker', () => {
     );
     const body = await response.text();
 
-    expect(body.match(/<h2>Monaco<\/h2>/g)).toHaveLength(1);
+    expect(body.match(/<h2>Istanbul<\/h2>/g)).toHaveLength(1);
     expect(body).toContain('<h3>mark</h3>');
     expect(body).toContain('<h3>ada</h3>');
     expect(body).toContain('action="/istanbul-mark/sessions"');

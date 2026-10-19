@@ -1,11 +1,13 @@
 export interface GatewayStartupOptions {
   localTmux?: string;
+  remoteTerminal?: string;
   authArguments: string[];
 }
 
 export function parseGatewayStartupOptions(args: string[]): GatewayStartupOptions {
   const authArguments: string[] = [];
   let localTmux: string | undefined;
+  let remoteTerminal: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index]!;
@@ -27,8 +29,17 @@ export function parseGatewayStartupOptions(args: string[]): GatewayStartupOption
       localTmux = socket;
       continue;
     }
+    if (argument === '--remote-terminal') {
+      if (remoteTerminal !== undefined) throw new Error('Duplicate argument: --remote-terminal');
+      const upstream = args[++index];
+      if (!upstream || upstream.startsWith('--')) {
+        throw new Error('--remote-terminal requires an HTTPS upstream URL');
+      }
+      remoteTerminal = upstream;
+      continue;
+    }
     throw new Error(`Unknown argument: ${argument}`);
   }
 
-  return {localTmux, authArguments};
+  return {localTmux, remoteTerminal, authArguments};
 }

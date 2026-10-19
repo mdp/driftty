@@ -15,21 +15,41 @@ jobs:
       tag: ${{ github.ref_name }}
     secrets: inherit
 
+  native:
+    uses: ./.github/workflows/native.yml
+    with:
+      version: ${{ github.ref_name }}
+
   release:
-    needs: publish
+    needs: [publish, native]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun scripts/package-release.ts "${GITHUB_REF_NAME}"
       - run: cp "release/driftty-${GITHUB_REF_NAME#v}.tar.gz" release/driftty-compose.tar.gz
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-terminal-*
+          path: release
+          merge-multiple: true
+      - name: Assemble release checksums and installer
+        run: |
+          cp install.sh release/install.sh
+          cd release
+          sha256sum driftty-compose.tar.gz driftty-terminal-linux-*.tar.gz install.sh > SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: release/driftty-compose.tar.gz
+          fail_on_unmatched_files: true
+          files: |
+            release/driftty-compose.tar.gz
+            release/driftty-terminal-linux-*.tar.gz
+            release/SHA256SUMS
+            release/install.sh
 
   latest:
-    needs: publish
+    needs: [publish, release]
     runs-on: ubuntu-latest
     steps:
       - uses: docker/setup-buildx-action@v3

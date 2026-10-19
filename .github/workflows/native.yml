@@ -1,0 +1,58 @@
+name: Standalone terminal
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        default: dev
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+      - run: npm ci
+      - name: Build static executable with embedded UI
+        env:
+          VERSION: ${{ inputs.version }}
+        run: sh scripts/build-native.sh "$VERSION"
+      - name: Verify architecture and static linking
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          file dist/driftty-terminal
+          case "$ARCH" in
+            x86_64) readelf -h dist/driftty-terminal | grep -q 'Machine:.*X86-64' ;;
+            aarch64) readelf -h dist/driftty-terminal | grep -q 'Machine:.*AArch64' ;;
+          esac
+          test -z "$(readelf -l dist/driftty-terminal | grep INTERP)"
+          test -z "$(readelf -d dist/driftty-terminal | grep NEEDED)"
+          ./dist/driftty-terminal --version
+      - run: bun scripts/native-smoke.ts
+      - run: node --test scripts/install.node.integration.mjs
+      - name: Package release archive
+        env:
+          VERSION: ${{ inputs.version }}
+        run: node scripts/package-native.mjs "$VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-terminal-${{ matrix.arch }}
+          path: release/driftty-terminal-linux-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error

@@ -302,10 +302,11 @@ export async function parseGatewayPlan(
       );
     }
 
-    let hostGroup = hostGroups.get(host);
+    const hostGroupKey = host;
+    let hostGroup = hostGroups.get(hostGroupKey);
     if (!hostGroup) {
       hostGroup = `host-${hostGroups.size + 1}`;
-      hostGroups.set(host, hostGroup);
+      hostGroups.set(hostGroupKey, hostGroup);
     }
     const view: GatewayProfileView = {
       slug,
@@ -331,7 +332,9 @@ export async function parseGatewayPlan(
   });
 
   if (checkKeys) {
-    for (const {target} of instructions) {
+    for (const instruction of instructions) {
+      if (!('target' in instruction)) continue;
+      const {target} = instruction;
       try {
         await access(target.keyPath, constants.R_OK);
       } catch {

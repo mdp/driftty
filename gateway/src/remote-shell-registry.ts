@@ -1,8 +1,8 @@
 import type {
   FixedShellPlan,
   ShellRegistryPlan,
-} from './gateway-plan';
-import {randomSessionName, sessionSlug} from './names';
+} from './gateway-plan.ts';
+import {randomSessionName, sessionSlug} from './names.ts';
 
 export interface RemoteShell {
   kind?: 'shell' | 'local';

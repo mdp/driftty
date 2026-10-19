@@ -15,7 +15,57 @@
 </p>
 
 driftty packages a touch-friendly terminal client with `ttyd`, authentication,
-reconnection, and tmux/SSH routing. Start with one of these three paths.
+reconnection, and tmux/SSH routing. Start with a standalone binary or one of the
+Docker and hosted options below.
+
+## Standalone binary (Linux)
+
+One terminal, one executable, no Docker or gateway needed. Releases include
+statically linked **x86_64** and **aarch64** binaries with the mobile UI embedded.
+
+```sh
+curl -fsSL https://github.com/mdp/driftty/releases/latest/download/install.sh | sh
+driftty-terminal bash -l
+```
+
+Open <http://127.0.0.1:7681>. Startup prints username **`driftty`** and a fresh,
+cryptographically random **30-character lowercase base36 password** for the
+browser's Basic Auth prompt. The listener defaults to **127.0.0.1:7681**, terminal
+input is enabled, and cross-origin WebSocket connections are rejected. Nothing
+is installed as a service or started automatically by the installer.
+
+The installer verifies SHA-256 checksums and installs to `~/.local/bin` without
+sudo. If that directory is not on your PATH, follow the printed PATH hint.
+To select a release or installation directory:
+
+```sh
+curl -fsSL https://github.com/mdp/driftty/releases/latest/download/install.sh |
+  sh -s -- --version vX.Y.Z --bin-dir "$HOME/.local/bin"
+```
+
+Replace `vX.Y.Z` with a published release that includes the native binaries.
+To choose persistent credentials or change the port:
+
+```sh
+driftty-terminal -p 8080 -c 'driftty:your-password' bash -l
+```
+
+**Basic Auth does not encrypt HTTP.** For a remote box, leave the default
+loopback bind in place and forward the port from your laptop:
+
+```sh
+ssh -N -L 7681:127.0.0.1:7681 user@remote-box
+```
+
+Then open <http://127.0.0.1:7681> locally. Use `-i <private-IP>` to bind on a
+trusted VPN instead, or configure ttyd's TLS options for HTTPS. Do not expose
+plain HTTP on the public internet. Generated credentials rotate on restart and
+are printed in startup output; protect those logs. Explicit `-c` credentials
+can appear in process listings and shell history.
+
+Replace `bash -l` with any installed TUI command. Commands start when a browser
+connects; use `tmux attach-session` for persistence across reconnects. Build and
+release details: [`scripts/native/README.md`](scripts/native/README.md).
 
 ## 1. Try it with Docker
 
@@ -84,6 +134,121 @@ wrapper. The short local-development version is
 | Gateway against a local tmux socket | [`local-tmux`](./examples/local-tmux/README.md) |
 | Local SSH/tmux integration environment | [`docker-development`](./examples/docker-development/README.md) |
 | Release bundle or detailed profile reference | [`gateway-reference`](./examples/gateway-reference/README.md) |
+
+## Gateway configuration and direct execution
+
+From the checkout:
+
+```sh
+npm ci
+npm run env:check
+npm run compose -- config --quiet
+npm run compose -- up -d --wait
+```
+
+The root schema requires the Cloudflare token. Its gateway password is optional,
+matching the generated-password behavior. Both deployment examples require a
+password; the development schema also validates ports and user/group IDs.
+Use the example's own environment files with:
+
+```sh
+npm run compose:cloudflare -- up -d --wait
+npm run compose:development -- run --build --rm keygen development
+npm run compose:development -- up --build -d --wait
+```
+
+For a copied example or release bundle, install the standalone Varlock CLI or
+use the pinned npm command from that deployment directory:
+
+```sh
+npx --yes varlock@1.18.0 load --agent
+npx --yes varlock@1.18.0 run --inject vars -- docker compose up -d --wait
+```
+
+`load --agent` gives redacted diagnostics. Raw JSON, env/shell exports, and
+`printenv` can reveal secrets. Wrapping Compose validates and injects settings;
+it does not encrypt `.env` files, hide the container environment from Docker
+administrators, or protect output from later unwrapped commands. SSH private
+keys remain files in `keys/`. The one-command terminal trial needs no Varlock.
+
+## Security and connection behavior
+
+The gateway password protects the picker and every terminal HTTP, asset,
+token, and WebSocket route. Only `/login`, `/logout`, and `/_health` are
+public. Login creates a signed, HTTP-only session for 30 days. Cookies are
+marked secure when HTTPS reaches the gateway directly or is reported through
+`X-Forwarded-Proto`.
+
+The signing key derives from `DRIFTTY_PASSWORD`. Keeping the password preserves
+browser sessions across restarts; changing it invalidates them. An automatic
+password is deliberately process-local and rotates on restart.
+
+For trusted-network development only, pass `--no-auth` to the gateway (for
+example, `command: ["--no-auth"]` in Compose). It overrides
+`DRIFTTY_PASSWORD`, prints a warning, and removes login controls. Never use it
+on an untrusted network.
+
+SSH uses keys only, learns previously unseen host keys, and rejects changed
+ones. Each browser terminal gets its own SSH process; tmux preserves the remote
+shell behind it. Local mode instead runs a containerized tmux client against
+the mounted host socket. The TypeScript gateway handles authenticated HTTP and
+WebSocket routing in-process and can run on Bun or Node.js.
+
+Run the gateway and optional workspace daemon from a checkout:
+
+```bash
+npm run driftty -- serve
+# Bun alternative:
+npm run driftty:bun -- serve
+```
+
+`serve` uses the packaged Driftty terminal client (building it only when the
+client is missing), then runs the public gateway and, when
+`DRIFTTY_ENABLE_WORKSPACES=1`, the Vercel workspace API in the same process.
+It downloads ttyd **1.7.7** on first use, verifies the official release SHA-256,
+and caches the executable under `~/.cache/driftty/ttyd/`; no global ttyd
+installation is needed. The managed binary currently supports Linux x64/arm64
+and Windows x64. SSH profiles still require the system `ssh` client.
+With no profile file, it starts an empty gateway rather than requiring
+container-mounted `/config` paths. Put `profiles.yaml` and (for workspace
+provisioning) `workspaces.yaml` in `~/.config/driftty/`; state and SSH known
+hosts default to `~/.local/state/driftty/`. `XDG_CONFIG_HOME` and
+`XDG_STATE_HOME` are honored, and `PROFILES_FILE`, `DRIFTTY_PROJECTS_FILE`,
+`DRIFTTY_STATE_FILE`, and `KNOWN_HOSTS_FILE` can override individual paths.
+
+Set `DRIFTTY_PORT` to change the public listener. For SSH profiles, install
+`ssh` and configure keys in `profiles.yaml`. To use Vercel workspaces,
+enable them and provide the Vercel credentials plus project definitions. A
+standalone remote terminal is also available with `--remote-terminal
+https://…` and `DRIFTTY_REMOTE_TERMINAL_AUTH`. `driftty workspace ...` remains
+the client for managing workspaces through the running server.
+
+To restrict a host run to the Tailscale interface, set `DRIFTTY_HOST` to the
+machine's Tailscale IPv4 address (for example, `100.x.y.z`).
+
+When a shell exits normally, driftty shows an **Exited** screen. Unexpected
+network interruptions reconnect with backoff.
+
+## Develop the web client
+
+The fast UI loop runs Vite with hot module replacement and proxies `/token`
+and `/ws` to a disposable Alpine terminal:
+
+```bash
+DRIFTTY_DEV_TOKEN=abc123secret \
+  DRIFTTY_DEV_TAILSCALE_IP="$(tailscale ip -4)" \
+  DRIFTTY_DEV_HOSTNAME=aachen.weasel-dojo.ts.net \
+  docker compose -f compose.dev.yaml up --build -d
+```
+
+Open `http://127.0.0.1:7681/abc123secret` once to set the development access
+cookie. For the tailnet URL, replace the host with the value supplied in
+`DRIFTTY_DEV_HOSTNAME`. Changes under `src/` reload automatically.
+
+If you only need loopback, Compose still requires the Tailscale values because
+it declares both port bindings. A local-only invocation can use
+`DRIFTTY_DEV_TAILSCALE_IP=127.0.0.2` and
+`DRIFTTY_DEV_HOSTNAME=localhost`.
 
 ## Security notes
 

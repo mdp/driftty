@@ -83,7 +83,7 @@ RUN apk add --no-cache build-base bison curl libevent-dev ncurses-dev \
 
 FROM generic AS gateway
 
-RUN apk add --no-cache caddy openssh-client libstdc++ libgcc tmux
+RUN apk add --no-cache nodejs openssh-client libstdc++ libgcc tmux
 COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun
 COPY --from=tmux-legacy /tmux-3.5a/tmux /usr/local/bin/tmux-3.5a
 WORKDIR /opt/driftty

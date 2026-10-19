@@ -104,17 +104,26 @@ describe('gateway plan', () => {
     expect(plan.get('baz')).toBe(plan.direct[0]);
   });
 
-  test('groups multiple public views by host without passing hostnames to the picker', async () => {
+  test('resolves SSH keys from a configurable key directory', async () => {
+    const plan = await parseGatewayPlan(valid, {
+      checkKeys: false,
+      keysDir: '/custom/keys',
+    });
+    expect(plan.direct[0]?.target.keyPath)
+      .toBe('/custom/keys/baz');
+  });
+
+  test('groups multiple public views without passing hostnames to the picker', async () => {
     const plan = await parseGatewayPlan(`profiles:
   - slug: login
     label: Login
-    host_label: Monaco
+    host_label: Istanbul
     host: secret.example.net
     user: mark
     key: login
   - slug: shells
     label: Shells
-    host_label: Monaco
+    host_label: Istanbul
     host: secret.example.net
     user: ada
     key: shells
@@ -125,6 +134,28 @@ describe('gateway plan', () => {
       .toEqual(['host-1', 'host-1']);
     expect(plan.views.map(({user}) => user)).toEqual(['mark', 'ada']);
     expect(JSON.stringify(plan.views)).not.toContain('secret.example.net');
+  });
+
+  test('keeps SSH users under the same host picker group', async () => {
+    const plan = await parseGatewayPlan(`profiles:
+  - slug: istanbul-mdp
+    label: MDP
+    host_label: Istanbul
+    host: istanbul.example.net
+    user: mdp
+    key: istanbul
+    new_sessions: true
+  - slug: istanbul-mdp-1984
+    label: MDP 1984
+    host_label: Istanbul
+    host: istanbul.example.net
+    user: mdp-1984
+    key: istanbul
+    new_sessions: true
+`, {checkKeys: false});
+
+    expect(plan.views.map(({hostLabel}) => hostLabel)).toEqual(['Istanbul', 'Istanbul']);
+    expect(plan.views[0]?.hostGroup).toBe(plan.views[1]?.hostGroup);
   });
 
   test('resolves fixed and managed shell policy for one registry', async () => {

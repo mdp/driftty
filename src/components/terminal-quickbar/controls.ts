@@ -1,4 +1,5 @@
 import type {TerminalAction} from '../terminal-actions';
+import {controlSequence, terminalActionSequence} from '../terminal-actions';
 import type {QuickbarMode} from './mode';
 
 export type QuickbarControl =
@@ -44,3 +45,9 @@ export const scrollControls: QuickbarControl[] = [
   {label: 'PgDn', action: 'page-down'},
   {label: 'End', action: 'tmux-scroll-exit'},
 ];
+
+export function quickbarControlSequence(control: QuickbarControl): string {
+  if ('action' in control) return terminalActionSequence(control.action);
+  if ('control' in control) return controlSequence(control.control);
+  return control.text;
+}

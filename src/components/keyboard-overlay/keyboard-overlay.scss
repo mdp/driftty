@@ -169,9 +169,6 @@ $cut: 8px;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 6px;
 
-    &--ctrl {
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-    }
   }
 
   &__keyboard {
@@ -212,9 +209,6 @@ $cut: 8px;
       }
     }
 
-    .keyboard-overlay__mode-label {
-      margin-bottom: 4px;
-    }
   }
 
   &__key-row {
@@ -325,15 +319,6 @@ $cut: 8px;
     padding: 4px;
     font-size: 13px;
 
-    &--accent {
-      color: $cyan;
-      background:
-        linear-gradient(135deg, rgba($cyan, 0.18), rgba(12, 27, 34, 0.96));
-      box-shadow:
-        inset 0 0 0 1px rgba($cyan, 0.55),
-        0 0 10px rgba($cyan, 0.08);
-    }
-
     &--danger {
       color: #ffdbe3;
       background:
@@ -346,43 +331,6 @@ $cut: 8px;
       }
     }
 
-    &--latched {
-      color: $void;
-      background: linear-gradient(135deg, $amber, #ff9f43);
-      box-shadow:
-        inset 0 -2px 0 rgba(76, 38, 0, 0.35),
-        0 0 16px rgba($amber, 0.34);
-      text-shadow: none;
-
-      &::before {
-        background: $magenta;
-        box-shadow: 0 0 8px $magenta;
-      }
-    }
-  }
-
-  &__mode-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0 0 7px;
-    color: $amber;
-    font: 800 10px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
-    letter-spacing: 0.18em;
-    text-align: center;
-    text-shadow: 0 0 10px rgba($amber, 0.35);
-
-    &::before,
-    &::after {
-      flex: 1;
-      height: 1px;
-      content: '';
-      background: linear-gradient(90deg, transparent, rgba($amber, 0.7));
-    }
-
-    &::after {
-      background: linear-gradient(90deg, rgba($amber, 0.7), transparent);
-    }
   }
 }
 
@@ -500,9 +448,6 @@ $cut: 8px;
     &__buttons {
       grid-template-columns: repeat(3, minmax(0, 1fr));
 
-      &--ctrl {
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-      }
     }
 
     &__button {

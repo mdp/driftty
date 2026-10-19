@@ -1,18 +1,24 @@
 import {Component, h} from 'preact';
 import {Xterm} from '../terminal/xterm';
 import {
-  agentKeys,
   applyInputModifier,
-  controlKeys,
   type InputModifier,
   letterRows,
-  navigationKeys,
   sequences,
   symbolRows,
-  tmuxKeys,
-  tmuxScrollKeys,
-  type ToolbarKey,
 } from './keys';
+import {
+  quickbarControls,
+  quickbarControlSequence,
+  scrollControls,
+  type QuickbarControl,
+} from '../terminal-quickbar/controls';
+import {
+  keyboardQuickbarModes,
+  loadQuickbarMode,
+  saveQuickbarMode,
+  type QuickbarMode,
+} from '../terminal-quickbar/mode';
 import './keyboard-overlay.scss';
 
 interface Props {
@@ -22,12 +28,12 @@ interface Props {
   onHeightChange: (height: number) => void;
 }
 
-type Section = 'agent' | 'nav' | 'ctrl' | 'tmux' | 'tmux-scroll';
 type KeyboardLayer = 'letters' | 'symbols';
 
 interface State {
   modifier?: InputModifier;
-  section: Section;
+  mode: QuickbarMode;
+  scrollControls: boolean;
   layer: KeyboardLayer;
 }
 
@@ -39,7 +45,8 @@ export class KeyboardOverlay extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = {
-      section: 'agent',
+      mode: this.loadMode(),
+      scrollControls: false,
       layer: 'letters',
     };
   }
@@ -85,14 +92,6 @@ export class KeyboardOverlay extends Component<Props, State> {
     if (modifier) this.props.terminal.clearInputModifier();
   };
 
-  private sendToolbarKey = ({sequence}: ToolbarKey) => {
-    this.sendKey(sequence);
-  };
-
-  private armModifier = (modifier: InputModifier) => {
-    this.props.terminal.armInputModifier(modifier);
-  };
-
   private toggleModifier = (modifier: InputModifier) => {
     if (this.activeModifier === modifier) {
       this.props.terminal.clearInputModifier();
@@ -101,30 +100,41 @@ export class KeyboardOverlay extends Component<Props, State> {
     }
   };
 
-  private enterTmuxScroll = () => {
-    this.sendKey(sequences.tmuxScroll);
-    this.setState({section: 'tmux-scroll'});
+  private loadMode(): QuickbarMode {
+    const mode = loadQuickbarMode(window.sessionStorage);
+    return keyboardQuickbarModes.includes(mode) ? mode : 'agent';
+  }
+
+  private selectMode = (mode: QuickbarMode) => {
+    saveQuickbarMode(window.sessionStorage, mode);
+    this.setState({mode, scrollControls: false});
   };
 
-  private exitTmuxScroll = () => {
-    this.sendKey(sequences.tmuxScrollExit);
-    this.setState({section: 'tmux'});
+  private sendQuickbarControl = (control: QuickbarControl) => {
+    this.sendKey(quickbarControlSequence(control));
+    if ('action' in control) {
+      if (control.action === 'tmux-scroll') {
+        this.setState({scrollControls: true});
+      } else if (
+        control.action === 'tmux-scroll-exit' ||
+        control.action === 'escape'
+      ) {
+        this.setState({scrollControls: false});
+      }
+    }
   };
 
-  private renderKey = (key: ToolbarKey) => (
+  private renderQuickbarControl = (control: QuickbarControl) => (
     <button
-      key={key.label}
+      key={control.label}
       class={`keyboard-overlay__button ${
-        key.emphasis
-          ? `keyboard-overlay__button--${key.emphasis}`
-          : ''
+        control.danger ? 'keyboard-overlay__button--danger' : ''
       }`}
       onMouseDown={(event) => event.preventDefault()}
-      onClick={() => this.sendToolbarKey(key)}
-      title={key.title}
-      aria-label={key.title}
+      onClick={() => this.sendQuickbarControl(control)}
+      aria-label={`Send ${control.label} to terminal`}
     >
-      {key.label}
+      {control.label}
     </button>
   );
 
@@ -179,12 +189,13 @@ export class KeyboardOverlay extends Component<Props, State> {
                 ⇧
               </button>
             ) : null}
-            {row.map(({label, value}) =>
-              this.renderTypingKey(
-                shifted ? label.toUpperCase() : label,
-                value
-              )
-            )}
+            {row.map(({label, value, shiftedValue}) => {
+              const displayedValue = shifted
+                ? (shiftedValue ?? label.toUpperCase())
+                : label;
+              const inputValue = shifted ? (shiftedValue ?? value) : value;
+              return this.renderTypingKey(displayedValue, inputValue);
+            })}
             {layer === 'letters' && rowIndex === 2
               ? this.renderTypingKey(
                   '⌫',
@@ -256,81 +267,23 @@ export class KeyboardOverlay extends Component<Props, State> {
   }
 
   private renderSection() {
-    const {modifier, section} = this.state;
-
-    if (section === 'tmux-scroll') {
-      return (
-        <>
-          <div class="keyboard-overlay__mode-label">TMUX SCROLL</div>
-          <div class="keyboard-overlay__buttons">
-            {tmuxScrollKeys.map(this.renderKey)}
-            <button
-              class="keyboard-overlay__button keyboard-overlay__button--danger"
-              onClick={this.exitTmuxScroll}
-            >
-              Exit
-            </button>
-          </div>
-        </>
-      );
-    }
-
-    if (section === 'ctrl') {
-      return (
-        <div class="keyboard-overlay__buttons keyboard-overlay__buttons--ctrl">
-          <button
-            class={`keyboard-overlay__button keyboard-overlay__button--accent ${
-              modifier === 'ctrl' ? 'keyboard-overlay__button--latched' : ''
-            }`}
-            onClick={() => this.armModifier('ctrl')}
-            title="Apply Ctrl to the next native-keyboard character"
-            aria-label="Apply Ctrl to the next native-keyboard character"
-          >
-            CTRL
-          </button>
-          <button
-            class={`keyboard-overlay__button keyboard-overlay__button--accent ${
-              modifier === 'shift' ? 'keyboard-overlay__button--latched' : ''
-            }`}
-            onClick={() => this.armModifier('shift')}
-            title="Apply Shift to the next native-keyboard character"
-            aria-label="Apply Shift to the next native-keyboard character"
-          >
-            SHIFT
-          </button>
-          {controlKeys.map(this.renderKey)}
-        </div>
-      );
-    }
-
-    const keys =
-      section === 'nav' ? navigationKeys : section === 'tmux' ? tmuxKeys : agentKeys;
+    const controls = this.state.scrollControls
+      ? scrollControls
+      : quickbarControls[this.state.mode];
     return (
       <div class="keyboard-overlay__buttons">
-        {keys.map(this.renderKey)}
-        {section === 'agent' || section === 'tmux' ? (
-          <button
-            class="keyboard-overlay__button keyboard-overlay__button--accent"
-            onClick={this.enterTmuxScroll}
-            title="Enter tmux copy mode and show scroll controls"
-          >
-            Scroll
-          </button>
-        ) : null}
+        {this.renderQuickbarControl({
+          label: 'Esc',
+          action: 'escape',
+          danger: true,
+        })}
+        {controls.map(this.renderQuickbarControl)}
       </div>
     );
   }
 
   render() {
     if (!this.props.show) return null;
-
-    const sections: Array<{id: Exclude<Section, 'tmux-scroll'>; label: string}> =
-      [
-        {id: 'agent', label: 'Agent'},
-        {id: 'nav', label: 'Nav'},
-        {id: 'ctrl', label: 'Ctrl'},
-        {id: 'tmux', label: 'tmux'},
-      ];
 
     return (
       <div
@@ -341,21 +294,27 @@ export class KeyboardOverlay extends Component<Props, State> {
         <div class="keyboard-overlay__status">
           <span>Full keyboard</span>
           <span class="keyboard-overlay__status-section">
-            {this.state.section.replace('-', ' ')}
+            {this.state.scrollControls ? 'tmux scroll' : this.state.mode}
           </span>
         </div>
         <div class="keyboard-overlay__rail">
-          {sections.map(({id, label}) => (
+          {keyboardQuickbarModes.map((mode) => (
             <button
-              key={id}
+              key={mode}
               class={`keyboard-overlay__tab ${
-                this.state.section === id
+                !this.state.scrollControls && this.state.mode === mode
                   ? 'keyboard-overlay__tab--active'
                   : ''
               }`}
-              onClick={() => this.setState({section: id})}
+              onClick={() => this.selectMode(mode)}
             >
-              {label}
+              {mode === 'nav'
+                ? 'Nav'
+                : mode === 'tmux'
+                  ? 'tmux'
+                  : mode === 'ctrl'
+                    ? 'Ctrl'
+                    : 'Agent'}
             </button>
           ))}
           <button

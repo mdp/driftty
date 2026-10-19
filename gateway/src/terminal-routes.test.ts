@@ -53,7 +53,6 @@ function harness({
 } = {}) {
   const commands: string[][] = [];
   const processes: DeferredProcess[] = [];
-  const configs: string[] = [];
   const routes = new TerminalRoutes({
     onFatal: () => undefined,
     startupTimeoutMs: 100,
@@ -67,20 +66,17 @@ function harness({
       },
       probe,
       readClient,
-      writeConfig: async (_path, source) => {
-        configs.push(source);
-      },
       delay: async () => undefined,
     },
   });
-  return {commands, configs, processes, routes};
+  return {commands, processes, routes};
 }
 
 describe('terminal routes', () => {
   test('publishes a session route only after ttyd is ready', async () => {
     let releaseProbe!: (ready: boolean) => void;
     const probeStarted = Promise.withResolvers<void>();
-    const {configs, routes} = harness({
+    const {routes} = harness({
       probe: () => {
         probeStarted.resolve();
         return new Promise((resolve) => {
@@ -91,11 +87,15 @@ describe('terminal routes', () => {
 
     const starting = routes.ensureSession(remote);
     await probeStarted.promise;
-    expect(configs).toHaveLength(0);
+    expect(routes.proxyRoutes()).toHaveLength(0);
 
     releaseProbe(true);
     await starting;
-    expect(configs.at(-1)).toContain('path /aachen/bold-ada/');
+    expect(routes.proxyRoutes()).toContainEqual({
+      path: 'aachen/bold-ada', upstream: 'http://127.0.0.1:7800',
+      stripPrefix: true,
+      serveRoot: true,
+    });
   });
 
   test('coalesces concurrent startup for the same session', async () => {
@@ -109,8 +109,8 @@ describe('terminal routes', () => {
     expect(commands.filter(([command]) => command === 'ttyd')).toHaveLength(1);
   });
 
-  test('keeps a failed ttyd process out of Caddy configuration', async () => {
-    const {configs, processes, routes} = harness({
+  test('keeps a failed ttyd process out of the live route table', async () => {
+    const {processes, routes} = harness({
       probe: async () => new Promise(() => undefined),
     });
 
@@ -118,8 +118,27 @@ describe('terminal routes', () => {
     processes[0]!.finish(17);
 
     await expect(starting).rejects.toThrow('exited with status 17');
-    expect(configs.join('\n')).not.toContain('/aachen/bold-ada/');
+    expect(routes.proxyRoutes()).toHaveLength(0);
     expect(processes[0]!.killed).toContain('SIGTERM');
+  });
+
+  test('handles a ttyd spawn error without an unhandled child-process rejection', async () => {
+    const routes = new TerminalRoutes({
+      onFatal: () => undefined,
+      dependencies: {
+        spawn: () => ({
+          exited: Promise.reject(new Error('spawn ttyd ENOENT')),
+          kill: () => undefined,
+        }),
+        probe: async () => false,
+        readClient: async () => new Uint8Array(),
+        delay: async () => undefined,
+      },
+    });
+
+    await expect(routes.ensureSession(remote)).rejects.toThrow('spawn ttyd ENOENT');
+    expect(routes.proxyRoutes()).toHaveLength(0);
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   test('uses the inherited client for direct and tmux terminal routes', async () => {
@@ -137,20 +156,22 @@ describe('terminal routes', () => {
     for (const command of ttydCommands) {
       expect(command).toContain('--index');
       expect(command).toContain('/usr/share/ttyd/index.html');
+      expect(command).not.toContain('--srv-buf-size');
+      expect(command).not.toContain('--base-path');
     }
     expect(await (await routes.clientResponse()).text())
       .toBe('<style>html,body{margin:0}</style>');
   });
 
   test('removes a terminal route when its ttyd process exits', async () => {
-    const {configs, processes, routes} = harness();
+    const {processes, routes} = harness();
     await routes.ensureSession(remote);
-    expect(configs.at(-1)).toContain('/aachen/bold-ada/');
+    expect(routes.proxyRoutes()).toHaveLength(1);
 
     processes[0]!.finish(0);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(configs.at(-1)).not.toContain('/aachen/bold-ada/');
+    expect(routes.proxyRoutes()).toHaveLength(0);
   });
 
   test('does not start the gateway without its inherited mobile client', async () => {
@@ -160,7 +181,7 @@ describe('terminal routes', () => {
       },
     });
 
-    await expect(routes.startCaddy()).rejects.toThrow('mobile client is missing');
+    await expect(routes.prepare()).rejects.toThrow('mobile client is missing');
     expect(commands).toHaveLength(0);
   });
 });

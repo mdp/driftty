@@ -1,5 +1,6 @@
 import {dirname} from 'node:path';
-import type {RemoteShellConnection} from './remote-shell-registry';
+import type {RemoteShellConnection} from './remote-shell-registry.ts';
+import {processOutput} from './process.ts';
 
 const defaultWrapper = '/usr/local/lib/driftty-local/bin/tmux';
 
@@ -30,16 +31,9 @@ export class LocalTmuxConnection implements RemoteShellConnection {
     command: string,
     {allowEmpty = false}: {allowEmpty?: boolean} = {},
   ): Promise<string> {
-    const process = Bun.spawn(['sh', '-c', command], {
-      env: environmentWithoutTmux(this.socket, this.wrapper),
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    const [code, stdout, stderr] = await Promise.all([
-      process.exited,
-      new Response(process.stdout).text(),
-      new Response(process.stderr).text(),
-    ]);
+    const {code, stdout, stderr} = await processOutput(
+      ['sh', '-c', command], environmentWithoutTmux(this.socket, this.wrapper),
+    );
     if (code !== 0 && !(allowEmpty && code === 1 && stdout.trim() === '')) {
       throw new Error(
         `local tmux command failed for ${this.socket}: ${

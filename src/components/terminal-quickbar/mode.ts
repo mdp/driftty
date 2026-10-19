@@ -1,11 +1,25 @@
 export type QuickbarMode = 'agent' | 'nav' | 'tmux' | 'ctrl' | 'copy';
 
+export const quickbarModes: QuickbarMode[] = [
+  'agent',
+  'nav',
+  'tmux',
+  'ctrl',
+  'copy',
+];
+
+export const keyboardQuickbarModes: QuickbarMode[] = [
+  'agent',
+  'nav',
+  'tmux',
+  'ctrl',
+];
+
 const storageKey = 'ttyd-mobile:quickbar-mode';
-const modes: QuickbarMode[] = ['agent', 'nav', 'tmux', 'ctrl', 'copy'];
 
 export function loadQuickbarMode(storage: Storage): QuickbarMode {
   const value = storage.getItem(storageKey);
-  return modes.includes(value as QuickbarMode)
+  return quickbarModes.includes(value as QuickbarMode)
     ? (value as QuickbarMode)
     : 'agent';
 }

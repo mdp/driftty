@@ -1,5 +1,6 @@
-import type {SshTarget} from './gateway-plan';
-import type {RemoteShellConnection} from './remote-shell-registry';
+import type {SshTarget} from './gateway-plan.ts';
+import type {RemoteShellConnection} from './remote-shell-registry.ts';
+import {processOutput} from './process.ts';
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`;
@@ -53,15 +54,9 @@ export class SshConnection implements RemoteShellConnection {
     command: string,
     {allowEmpty = false}: {allowEmpty?: boolean} = {},
   ): Promise<string> {
-    const process = Bun.spawn(
+    const {code, stdout, stderr} = await processOutput(
       [...sshBaseCommand(this.target, this.knownHosts, false), command],
-      {stdout: 'pipe', stderr: 'pipe'},
     );
-    const [code, stdout, stderr] = await Promise.all([
-      process.exited,
-      new Response(process.stdout).text(),
-      new Response(process.stderr).text(),
-    ]);
     if (code !== 0 && !(allowEmpty && code === 1 && stdout.trim() === '')) {
       throw new Error(
         `SSH command for ${this.target.slug} failed: ${

@@ -3,6 +3,14 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@vercel/sandbox": "^3.5.1",
     "yaml": "2.8.2"
+  },
+  "scripts": {
+    "vercel:lifecycle": "bun scripts/vercel-lifecycle-smoke.ts",
+    "vercel:terminal-spike": "bun scripts/vercel-terminal-spike.ts"
+  },
+  "devDependencies": {
+    "bun-types": "^1.4.2"
   }
 }

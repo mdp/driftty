@@ -1,6 +1,15 @@
-import {readFile, writeFile} from 'node:fs/promises';
-import {caddyConfig, type LegacyRoute, type SessionRoute} from './caddy';
-import type {RemoteShell} from './remote-shell-registry';
+import {readFile} from 'node:fs/promises';
+import type {RemoteShell} from './remote-shell-registry.ts';
+import type {HttpProxyRoute} from './http-proxy.ts';
+import {spawnProcess} from './process.ts';
+
+export interface RemoteTerminalRoute {
+  slug: string;
+  path?: string;
+  stripPrefix?: boolean;
+  upstream: string;
+  authorization?: string;
+}
 
 export interface DirectTerminalTarget {
   slug: string;
@@ -17,21 +26,19 @@ export interface RemoteTerminalTarget {
 
 interface TerminalProcess {
   exited: Promise<number>;
-  kill(signal?: string): void;
+  kill(signal?: NodeJS.Signals): void;
 }
 
 interface TerminalRouteDependencies {
   spawn(command: string[]): TerminalProcess;
   probe(origin: string): Promise<boolean>;
   readClient(path: string): Promise<Uint8Array>;
-  writeConfig(path: string, source: string): Promise<void>;
   delay(milliseconds: number): Promise<void>;
 }
 
 interface TerminalRoutesOptions {
   onFatal: (exitCode: number) => void;
-  authEnabled?: boolean;
-  caddyfile?: string;
+  ttydPath?: string;
   clientPath?: string;
   pickerPort?: number;
   startPort?: number;
@@ -42,7 +49,7 @@ interface TerminalRoutesOptions {
 
 const defaultDependencies: TerminalRouteDependencies = {
   spawn(command) {
-    return Bun.spawn(command, {stdout: 'inherit', stderr: 'inherit'});
+    return spawnProcess(command);
   },
   async probe(origin) {
     try {
@@ -59,9 +66,6 @@ const defaultDependencies: TerminalRouteDependencies = {
   async readClient(path) {
     return new Uint8Array(await readFile(path));
   },
-  async writeConfig(path, source) {
-    await writeFile(path, source);
-  },
   delay(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
   },
@@ -73,41 +77,34 @@ function routeKey(hostSlug: string, sessionSlug: string): string {
 
 export class TerminalRoutes {
   private readonly onFatal: (exitCode: number) => void;
-  private readonly authEnabled: boolean;
-  private readonly caddyfile: string;
   private readonly clientPath: string;
-  private readonly pickerPort: number;
+  private readonly ttydPath: string;
   private readonly startupTimeoutMs: number;
   private readonly startupPollMs: number;
   private readonly dependencies: TerminalRouteDependencies;
   private readonly children = new Set<TerminalProcess>();
-  private readonly legacyRoutes: LegacyRoute[] = [];
+  private readonly legacyRoutes: Array<{slug: string; ttydPort: number}> = [];
   private readonly sessionChildren = new Map<string, TerminalProcess>();
-  private readonly sessionRoutes = new Map<string, SessionRoute>();
+  private readonly sessionRoutes = new Map<string, {hostSlug: string; sessionSlug: string; ttydPort: number}>();
+  private readonly remoteRoutes: RemoteTerminalRoute[] = [];
   private readonly startingSessions = new Map<string, Promise<void>>();
   private clientContents?: Promise<Uint8Array>;
   private nextPort: number;
   private stopping = false;
-  private caddyStarted = false;
-  private caddy?: TerminalProcess;
-  private reloadQueue = Promise.resolve();
+  private stopPromise?: Promise<void>;
 
   constructor({
     onFatal,
-    authEnabled = true,
-    caddyfile = '/tmp/driftty.Caddyfile',
+    ttydPath = 'ttyd',
     clientPath = '/usr/share/ttyd/index.html',
-    pickerPort = 7799,
     startPort = 7800,
     startupTimeoutMs = 5_000,
     startupPollMs = 50,
     dependencies = {},
   }: TerminalRoutesOptions) {
     this.onFatal = onFatal;
-    this.authEnabled = authEnabled;
-    this.caddyfile = caddyfile;
+    this.ttydPath = ttydPath;
     this.clientPath = clientPath;
-    this.pickerPort = pickerPort;
     this.nextPort = startPort;
     this.startupTimeoutMs = startupTimeoutMs;
     this.startupPollMs = startupPollMs;
@@ -118,12 +115,11 @@ export class TerminalRoutes {
     const ttydPort = this.nextPort++;
     const child = this.spawnTtyd(
       ttydPort,
-      `/${target.slug}`,
       target.label,
       target.command,
     );
     try {
-      await this.waitUntilReady(child, ttydPort, `/${target.slug}/`);
+      await this.waitUntilReady(child, ttydPort, '/');
     } catch (error) {
       child.kill('SIGTERM');
       throw error;
@@ -135,6 +131,35 @@ export class TerminalRoutes {
         this.onFatal(code || 1);
       }
     });
+  }
+
+  async startRemote(target: RemoteTerminalRoute): Promise<void> {
+    const upstream = new URL(target.upstream);
+    if (upstream.protocol !== 'https:' || upstream.username || upstream.password) {
+      throw new Error('remote terminal upstream must be an HTTPS URL without embedded credentials');
+    }
+    const path = target.path ?? target.slug;
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/.test(path)) {
+      throw new Error(`invalid remote terminal path: ${path}`);
+    }
+    const existing = this.remoteRoutes.findIndex(({slug}) => slug === target.slug);
+    const route = {...target, upstream: upstream.origin};
+    if (existing >= 0) {
+      const previous = this.remoteRoutes[existing]!;
+      if (
+        previous.path === route.path &&
+        previous.upstream === route.upstream &&
+        previous.authorization === route.authorization &&
+        previous.stripPrefix === route.stripPrefix
+      ) return;
+      this.remoteRoutes[existing] = route;
+    } else this.remoteRoutes.push(route);
+  }
+
+  async stopRemote(slug: string): Promise<void> {
+    const index = this.remoteRoutes.findIndex((route) => route.slug === slug);
+    if (index < 0) return;
+    this.remoteRoutes.splice(index, 1);
   }
 
   async ensureSession(target: RemoteTerminalTarget): Promise<void> {
@@ -156,19 +181,16 @@ export class TerminalRoutes {
     const live = new Set(
       terminals.map(({shell}) => routeKey(hostSlug, shell.slug)),
     );
-    let routesChanged = false;
     for (const [key, route] of this.sessionRoutes) {
       if (route.hostSlug !== hostSlug || live.has(key)) continue;
       this.sessionRoutes.delete(key);
       const child = this.sessionChildren.get(key);
       this.sessionChildren.delete(key);
       child?.kill('SIGTERM');
-      routesChanged = true;
     }
     await Promise.all(
       terminals.map((terminal) => this.ensureSession(terminal)),
     );
-    if (routesChanged) await this.reloadCaddy();
   }
 
   async clientResponse(): Promise<Response> {
@@ -179,32 +201,48 @@ export class TerminalRoutes {
     });
   }
 
-  async startCaddy(): Promise<void> {
+  /** Snapshot the currently-live dynamic routes for the in-process gateway. */
+  proxyRoutes(): HttpProxyRoute[] {
+    return [
+      ...this.legacyRoutes.map(({slug, ttydPort}) => ({
+        path: slug,
+        upstream: `http://127.0.0.1:${ttydPort}`,
+        stripPrefix: true,
+      })),
+      ...[...this.sessionRoutes.values()].map(({hostSlug, sessionSlug, ttydPort}) => ({
+        path: `${hostSlug}/${sessionSlug}`,
+        upstream: `http://127.0.0.1:${ttydPort}`,
+        stripPrefix: true,
+        serveRoot: true,
+      })),
+      ...this.remoteRoutes.map((route) => ({
+        path: route.path ?? route.slug,
+        upstream: route.upstream,
+        stripPrefix: route.stripPrefix,
+        authorization: route.authorization,
+      })),
+    ];
+  }
+
+  async prepare(): Promise<void> {
     this.clientContents ??= this.dependencies.readClient(this.clientPath);
     await this.clientContents;
-    await this.writeCaddyConfig();
-    const child = this.dependencies.spawn([
-      'caddy', 'run', '--config', this.caddyfile, '--adapter', 'caddyfile',
-    ]);
-    this.caddy = child;
-    this.caddyStarted = true;
-    this.trackChild(child);
-    child.exited.then((code) => {
-      if (!this.stopping) {
-        console.error(`caddy exited with status ${code}`);
-        this.onFatal(code || 1);
-      }
-    });
   }
 
-  stop(): void {
-    if (this.stopping) return;
+  stop(): Promise<void> {
+    if (this.stopPromise) return this.stopPromise;
     this.stopping = true;
-    for (const child of this.children) child.kill('SIGTERM');
-  }
-
-  async waitForCaddyExit(): Promise<void> {
-    await this.caddy?.exited;
+    const children = [...this.children];
+    for (const child of children) child.kill('SIGTERM');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    this.stopPromise = Promise.race([
+      Promise.allSettled(children.map(({exited}) => exited)).then(() => undefined),
+      new Promise<void>((resolve) => { timer = setTimeout(() => {
+        for (const child of children) child.kill('SIGKILL');
+        resolve();
+      }, 3_000); }),
+    ]).finally(() => { if (timer) clearTimeout(timer); });
+    return this.stopPromise;
   }
 
   private async startSession(
@@ -212,15 +250,13 @@ export class TerminalRoutes {
     key: string,
   ): Promise<void> {
     const ttydPort = this.nextPort++;
-    const basePath = `/${target.hostSlug}/${target.shell.slug}`;
     const child = this.spawnTtyd(
       ttydPort,
-      basePath,
       `${target.hostLabel} · ${target.shell.label}`,
       target.command,
     );
     try {
-      await this.waitUntilReady(child, ttydPort, `${basePath}/`);
+      await this.waitUntilReady(child, ttydPort, '/');
     } catch (error) {
       child.kill('SIGTERM');
       throw error;
@@ -242,26 +278,21 @@ export class TerminalRoutes {
       this.sessionRoutes.delete(key);
       if (!this.stopping) {
         console.log(`ttyd session ${key} exited with status ${code}`);
-        await this.reloadCaddy();
       }
     });
-    await this.reloadCaddy();
   }
 
   private spawnTtyd(
     ttydPort: number,
-    basePath: string,
     title: string,
     command: string[],
   ): TerminalProcess {
     const child = this.dependencies.spawn([
-      'ttyd',
+      this.ttydPath,
       '--interface', '127.0.0.1',
       '--port', String(ttydPort),
       '--writable',
-      '--srv-buf-size', '65536',
       '--index', this.clientPath,
-      '--base-path', basePath,
       '--client-option', `titleFixed=${title}`,
       ...command,
     ]);
@@ -271,7 +302,10 @@ export class TerminalRoutes {
 
   private trackChild(child: TerminalProcess): void {
     this.children.add(child);
-    child.exited.finally(() => this.children.delete(child));
+    void child.exited.then(
+      () => this.children.delete(child),
+      () => this.children.delete(child),
+    );
   }
 
   private async waitUntilReady(
@@ -299,35 +333,4 @@ export class TerminalRoutes {
     throw new Error(`ttyd at ${path} was not ready after ${this.startupTimeoutMs}ms`);
   }
 
-  private currentCaddyConfig(): string {
-    return caddyConfig(
-      this.legacyRoutes,
-      [...this.sessionRoutes.values()],
-      this.pickerPort,
-      this.authEnabled,
-    );
-  }
-
-  private async writeCaddyConfig(): Promise<void> {
-    await this.dependencies.writeConfig(
-      this.caddyfile,
-      this.currentCaddyConfig(),
-    );
-  }
-
-  private async reloadCaddy(): Promise<void> {
-    this.reloadQueue = this.reloadQueue.then(async () => {
-      await this.writeCaddyConfig();
-      if (!this.caddyStarted || this.stopping) return;
-      const reload = this.dependencies.spawn([
-        'caddy', 'reload', '--config', this.caddyfile, '--adapter', 'caddyfile',
-      ]);
-      this.trackChild(reload);
-      const code = await reload.exited;
-      if (code !== 0) {
-        console.error(`caddy reload exited with status ${code}`);
-      }
-    });
-    await this.reloadQueue;
-  }
 }
