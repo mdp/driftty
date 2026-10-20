@@ -23,6 +23,16 @@ async function fixture(options = {}) {
   const checksum = createHash('sha256').update(await readFile(archive)).digest('hex');
   await writeFile(join(root, 'SHA256SUMS'), `${options.badChecksum ? '0'.repeat(64) : checksum}  driftty-terminal-linux-${options.assetArch ?? 'x86_64'}.tar.gz\n`);
   await writeFile(join(tools, 'uname'), `#!/bin/sh\ncase "$1" in -s) echo '${options.os ?? 'Linux'}';; -m) echo '${options.arch ?? 'x86_64'}';; esac\n`, {mode: 0o755});
+  if (options.restrictedTemp) {
+    const mktemp = spawnSync('sh', ['-c', 'command -v mktemp'], {encoding: 'utf8'}).stdout.trim();
+    await writeFile(join(tools, 'mktemp'), `#!/bin/sh
+if [ "$1" = -d ]; then
+  printf '%s\\n' "$2" >> "$FIXTURE/temp-attempts"
+  case "$2" in "$INSTALL_BIN"/.driftty-install.*) ;; *) exit 1 ;; esac
+fi
+exec "${mktemp}" "$@"
+`, {mode: 0o755});
+  }
   // No real network: emulate curl's latest redirect and release downloads.
   await writeFile(join(tools, 'curl'), `#!/bin/sh
 set -eu
@@ -48,10 +58,10 @@ case "$url" in
 esac
 `, {mode: 0o755});
   const input = await readFile(installer, 'utf8');
-  return {root, bin, run(args = [], piped = false) {
+  return {root, bin, run(args = [], piped = false, env = {}) {
     return spawnSync('sh', piped ? ['-s', '--', ...args] : [installer, '--bin-dir', bin, ...args], {
       input: piped ? input : undefined,
-      env: {...process.env, HOME: root, PATH: `${tools}:${process.env.PATH}`, FIXTURE: root, TMPDIR: root}, encoding: 'utf8',
+      env: {...process.env, HOME: root, PATH: `${tools}:${process.env.PATH}`, FIXTURE: root, INSTALL_BIN: bin, TMPDIR: root, ...env}, encoding: 'utf8',
     });
   }, cleanup: () => rm(root, {recursive: true, force: true})};
 }
@@ -87,6 +97,23 @@ test('piped sh invocation installs to the default user-local bin directory', asy
     assert.equal(await readFile(join(f.root, '.local/bin/driftty-terminal'), 'utf8'), 'fake executable\n');
   } finally { await f.cleanup(); }
 });
+
+for (const tmpdir of ['', '/nonexistent/driftty-test-tmp']) {
+  test(`restricted temporary directories fall back to the destination (TMPDIR=${tmpdir || 'unset'})`, async () => {
+    const f = await fixture({restrictedTemp: true});
+    try {
+      const result = f.run([], false, {TMPDIR: tmpdir});
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(await readFile(join(f.bin, 'driftty-terminal'), 'utf8'), 'fake executable\n');
+      const attempts = (await readFile(join(f.root, 'temp-attempts'), 'utf8')).trim().split('\n');
+      assert.deepEqual(attempts, [
+        `${tmpdir || '/tmp'}/driftty-install.XXXXXX`,
+        `${f.bin}/.driftty-install.XXXXXX`,
+      ]);
+      assert(!(await readdir(f.bin)).some((name) => name.startsWith('.driftty-install.')));
+    } finally { await f.cleanup(); }
+  });
+}
 
 for (const options of [{badChecksum: true}, {downloadFailure: true}]) {
   test(`failed verification/download preserves an existing binary: ${JSON.stringify(options)}`, async () => {

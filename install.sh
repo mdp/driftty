@@ -42,9 +42,12 @@ fi
 case "$version" in v*) ;; *) version=v$version ;; esac
 printf '%s\n' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || fail 'version must be vX.Y.Z'
 
-temp_root=${TMPDIR:-/tmp}
-if [ -d /tmp/opencode ] && [ -z "${TMPDIR:-}" ]; then temp_root=/tmp/opencode; fi
-temporary=$(mktemp -d "$temp_root/driftty-install.XXXXXX")
+# The destination must be writable anyway. It also provides a fallback on hosts
+# where TMPDIR is stale or the system temporary directory is restricted.
+mkdir -p "$bin_dir" || fail "cannot create $bin_dir (use --bin-dir for a writable directory)"
+temporary=$(mktemp -d "${TMPDIR:-/tmp}/driftty-install.XXXXXX" 2>/dev/null) ||
+  temporary=$(mktemp -d "$bin_dir/.driftty-install.XXXXXX") ||
+  fail 'cannot create a private temporary directory; set TMPDIR to a writable directory'
 pending=
 cleanup() {
   [ -z "$pending" ] || rm -f "$pending"
@@ -75,7 +78,6 @@ fi
 if [ ! -f "$temporary/LICENSES.txt" ] || [ -L "$temporary/LICENSES.txt" ]; then
   fail 'invalid license notices in archive'
 fi
-mkdir -p "$bin_dir" || fail "cannot create $bin_dir (use --bin-dir for a writable directory)"
 pending=$(mktemp "$bin_dir/.driftty-terminal.XXXXXX")
 cp "$temporary/driftty-terminal" "$pending"
 chmod 755 "$pending"
